@@ -12,3 +12,4 @@ dist/
 
 # Large source PDF (41 MB building manual) — not needed to build or run.
 references/*.pdf
+.vercel

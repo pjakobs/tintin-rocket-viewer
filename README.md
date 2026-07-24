@@ -7,6 +7,9 @@ animation.
 
 ![viewer](docs/screenshot.png)
 
+**Live:** https://tintin-beta.vercel.app — every view (explode amount, build
+step, selected part, camera) is shareable via *Copy link*.
+
 ## Quick start
 
 ```bash
@@ -187,6 +190,20 @@ brick). `initFeatures()` collects exactly 1,255 of them and stores
   default view are written, so a plain visit keeps a clean URL. *Copy link* flushes
   and copies the current view immediately. Opening a copied link restores explode,
   step, selection (incl. the inspect panel), and camera exactly.
+
+## Deploying
+
+Deployed to Vercel from prebuilt output (`npm run deploy`, i.e.
+`vercel build --prod && vercel deploy --prebuilt --prod`) rather than letting
+Vercel build from raw source — a plain `vercel --prod` tries to upload the whole
+working directory and hits Vercel's 15,000-file cap (mostly `node_modules`).
+First-time setup: `npx vercel link` to connect this directory to a Vercel
+project, then `npm run deploy`.
+
+The GitHub repo is private, so **auto-deploy on push isn't connected** — Vercel's
+CLI can't authorize a private repo without a one-time consent flow in the
+browser (Vercel dashboard → Project → Settings → Git → Connect). Until then,
+`npm run deploy` is the way to publish changes.
 
 ## Extending it further
 
