@@ -51,18 +51,52 @@ for (const raw of model2.split(/\r?\n/)) {
 }
 if (cur) sections[cur] = buf.join('\n');
 
+// Studio writes geometry (type 2/3/4/5) with colour code -1 meaning "inherit the
+// part's colour". LDraw/three's LDrawLoader use 16 for that; it can't resolve a
+// material for -1 and silently drops those faces (the cones render as nothing).
+// Rewrite the colour token to 16 on geometry lines only (not on 0-meta lines,
+// where -1 is a real value e.g. FlexibleBrickControlPointUnitLength -1).
+function normalizeColours(text) {
+  // Studio uses negative colour codes on geometry to mean "inherit": -1 on faces,
+  // -2 on edges. LDraw can't resolve those (faces silently dropped, edges render
+  // as magenta "missing" specks). Remap: faces (3/4) -> 16, edges (2/5) -> 24.
+  return text.split(/\r?\n/).map((line) => {
+    const m = line.match(/^([2345])\s+(-\d+)\s+(.*)$/);
+    if (!m) return line;
+    const code = (m[1] === '2' || m[1] === '5') ? '24' : '16';
+    return `${m[1]} ${code} ${m[3]}`;
+  }).join('\n');
+}
+
+// Keep only real geometry lines (edges/tris/quads/conditional). Studio wraps the
+// geometry in non-standard meta (0 FILE, 0 CustomBrick, 0 IsSubModel,
+// 0 FlexibleBrick...) that makes LDrawLoader misclassify the file as a submodel
+// and emit no geometry. We drop all of that and wrap the geometry in a clean,
+// minimal LDraw part header instead.
+function geometryOnly(text) {
+  return text.split(/\r?\n/).filter((l) => /^[2345]\s/.test(l.trim())).join('\n');
+}
+
 for (const [src, dst] of Object.entries(MAP)) {
   const body = sections[src];
   if (!body) { console.error('No embedded section for', src, '— skipping'); continue; }
   // These sections are self-contained geometry (verified: no type-1 sub-refs).
-  const named = body
-    .replace(/^0 FILE .*/im, `0 FILE ${dst}`)
-    .replace(/^0 Name:.*/im, `0 Name: ${dst}`);
-  const header = `0 ${dst} — geometry extracted from BrickLink Studio .io (model2.ldr).\n` +
-    `0 This is the correct BrickLink part geometry, NOT LDraw's same-numbered part.\n`;
+  const geom = normalizeColours(geometryOnly(body));
+  // Human-readable description: first 0-comment that isn't a known directive.
+  const descLine = body.split(/\r?\n/).find((l) =>
+    /^0 /.test(l) &&
+    !/^0 (FILE|Name:|Author:|!|BFC|IsSubModel|CustomBrick|Flexible|BL_|RenderAngle|~Moved)/i.test(l.trim()));
+  const desc = (descLine ? descLine.replace(/^0 ~?/, '') : dst).replace(/\s+/g, ' ').trim();
+  const header =
+    `0 ${desc}\n` +
+    `0 Name: ${dst}\n` +
+    `0 !LDRAW_ORG Unofficial_Part\n` +
+    `0 BFC CERTIFY CCW\n` +
+    `0 // Geometry extracted from BrickLink Studio .io (model2.ldr) — the correct\n` +
+    `0 // BrickLink part geometry, NOT LDraw's same-numbered part. Colour -1 -> 16.\n`;
   for (const dir of LIBS) {
     if (!fs.existsSync(dir)) continue;
-    fs.writeFileSync(path.join(dir, dst), header + named + '\n');
+    fs.writeFileSync(path.join(dir, dst), header + geom + '\n');
     console.log('wrote', path.relative(root, path.join(dir, dst)));
   }
 }
