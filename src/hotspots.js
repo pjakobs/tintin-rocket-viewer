@@ -28,11 +28,37 @@ export function initHotspots({ THREE: _THREE, scene, camera, renderer, model, li
   // ---- selection + highlight ----------------------------------------------
   let selected = null;
   const savedMats = new Map(); // mesh -> original material (or array)
+
+  // Highlight box, drawn in the brick's OWN local frame and parented to the brick,
+  // so it hugs rotated parts and moves/rotates with them (explode, etc.). A plain
+  // world-space AABB would jut out sideways for the many parts placed at an angle.
   const boxHelper = new THREE.Box3Helper(new THREE.Box3(), new THREE.Color(HIGHLIGHT));
-  boxHelper.visible = false;
   boxHelper.material.depthTest = false;
   boxHelper.renderOrder = 999;
-  scene.add(boxHelper);
+
+  const _inv = new THREE.Matrix4();
+  const _m = new THREE.Matrix4();
+  const _corner = new THREE.Vector3();
+  // AABB of the brick's meshes expressed in the brick group's local coordinates.
+  function computeLocalBox(group, out) {
+    group.updateWorldMatrix(true, true);
+    _inv.copy(group.matrixWorld).invert();
+    out.makeEmpty();
+    group.traverse((o) => {
+      if (!o.isMesh) return;
+      const geo = o.geometry;
+      if (!geo.boundingBox) geo.computeBoundingBox();
+      _m.multiplyMatrices(_inv, o.matrixWorld);
+      const bb = geo.boundingBox;
+      for (let i = 0; i < 8; i++) {
+        _corner
+          .set(i & 1 ? bb.max.x : bb.min.x, i & 2 ? bb.max.y : bb.min.y, i & 4 ? bb.max.z : bb.min.z)
+          .applyMatrix4(_m);
+        out.expandByPoint(_corner);
+      }
+    });
+    return out;
+  }
 
   const emissiveClone = (m) => {
     const c = m.clone();
@@ -47,7 +73,7 @@ export function initHotspots({ THREE: _THREE, scene, camera, renderer, model, li
       mesh.material = mat;
     }
     savedMats.clear();
-    boxHelper.visible = false;
+    boxHelper.parent?.remove(boxHelper);
     selected = null;
   }
 
@@ -59,8 +85,9 @@ export function initHotspots({ THREE: _THREE, scene, camera, renderer, model, li
       savedMats.set(o, o.material);
       o.material = Array.isArray(o.material) ? o.material.map(emissiveClone) : emissiveClone(o.material);
     });
-    boxHelper.box.setFromObject(brick.group);
-    boxHelper.visible = true;
+    // Oriented highlight box: local-frame AABB parented to the brick.
+    computeLocalBox(brick.group, boxHelper.box);
+    brick.group.add(boxHelper);
   }
 
   // ---- info panel ----------------------------------------------------------
