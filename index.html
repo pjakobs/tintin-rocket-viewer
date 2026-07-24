@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tintin Moon Rocket — 3D Digital Twin</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { height: 100%; overflow: hidden; font-family: system-ui, sans-serif; }
+      #app { position: fixed; inset: 0; }
+      canvas { display: block; }
+
+      #hud {
+        position: fixed; top: 12px; left: 12px; z-index: 10;
+        background: rgba(20, 22, 28, 0.72); color: #e8eaf0;
+        padding: 12px 14px; border-radius: 10px; backdrop-filter: blur(6px);
+        font-size: 13px; line-height: 1.5; max-width: 280px;
+        border: 1px solid rgba(255,255,255,0.08);
+      }
+      #hud h1 { font-size: 14px; margin-bottom: 4px; letter-spacing: 0.2px; }
+      #hud .meta { color: #9aa0ac; font-size: 12px; }
+      #hud .row { display: flex; justify-content: space-between; gap: 12px; }
+      #hud .row span:last-child { color: #7dd3fc; font-variant-numeric: tabular-nums; }
+
+      #loading {
+        position: fixed; inset: 0; z-index: 20; display: grid; place-items: center;
+        background: #0b0d12; color: #e8eaf0; transition: opacity 0.4s;
+      }
+      #loading .bar { width: 240px; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-top: 12px; overflow: hidden; }
+      #loading .bar > div { height: 100%; width: 0%; background: #7dd3fc; transition: width 0.15s; }
+      #loading.hidden { opacity: 0; pointer-events: none; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="hud">
+      <h1>Tintin Moon Rocket <span class="meta">· 21367</span></h1>
+      <div class="meta" id="status">Initialising…</div>
+      <div class="row"><span>Bricks (LDR)</span><span id="stat-bricks">—</span></div>
+      <div class="row"><span>Manual CSV</span><span id="stat-csv">—</span></div>
+      <div class="row"><span>Meshes drawn</span><span id="stat-parts">—</span></div>
+      <div class="row"><span>Missing parts</span><span id="stat-missing">—</span></div>
+      <div class="meta" id="stat-note" style="margin-top:6px"></div>
+      <div class="meta" style="margin-top:8px">Drag to orbit · scroll to zoom · right-drag to pan</div>
+    </div>
+    <div id="loading">
+      <div>
+        <div style="text-align:center">Loading LEGO model…</div>
+        <div class="bar"><div id="progress"></div></div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
