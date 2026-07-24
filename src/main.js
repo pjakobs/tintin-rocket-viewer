@@ -3,6 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { LDrawLoader } from 'three/addons/loaders/LDrawLoader.js';
 import { LDrawConditionalLineMaterial } from 'three/addons/materials/LDrawConditionalLineMaterial.js';
 import { crossCheck } from './crosscheck.js';
+import { initFeatures } from './features.js';
 
 const MODEL_URL = '/model/tintin-rocket.ldr';
 // Slim LDraw library holding only the ~535 parts/primitives this model uses
@@ -141,6 +142,7 @@ function onModelLoaded(group, modelText) {
 
   frameModel(group);
   updateHUD();
+  initFeatures(model);
 
   statusEl.textContent = 'Ready';
   loadingEl.classList.add('hidden');

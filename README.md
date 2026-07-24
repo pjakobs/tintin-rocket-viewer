@@ -152,13 +152,32 @@ To render against the full library instead, set `LIBRARY_PATH = '/ldraw/'` in
 > library that's fine; with the full ~820 MB library, prune first or serve the
 > library separately.
 
-## Extending it (hotspots & build progress)
+## Interactive features (`src/features.js`)
+
+The bottom control bar drives two features off the per-part LDraw metadata:
+
+- **Exploded view** — the *Explode* slider slides every brick radially away from
+  the rocket's axis (0–100%). Each of the 1,255 brick groups gets a pre-computed
+  local displacement vector, so the update is one `copy + addScaledVector` per
+  brick.
+- **Build scrubber + Play** — the *Build step* slider reveals bricks up to a given
+  LDraw build step (there are **360**, in `userData.buildingStep`); *Play build*
+  animates it 0 → end. Mid-build you can see the internal bracing, just like the
+  instruction manual.
+
+Both work on **brick groups** — the outermost `Object3D` whose
+`userData.fileName` is a `.dat` part (nested sub-parts move/hide with their
+brick). `initFeatures()` collects exactly 1,255 of them and stores
+`model.bricks = [{ group, step, home, dir }]`, plus `model.setExplode(0..1)` and
+`model.setStep(n)` for the console.
+
+## Extending it further (hotspots)
 
 `window.viewer` exposes `{ THREE, scene, camera, renderer, controls, model }`.
-`model.parts` is `[{ object, partId, step }]` per mesh; `model.numSteps` is 360.
 
-- **Hotspots:** raycast against `model.parts.map(p => p.object)`; read the part
-  number from `object.userData.fileName` (walk up to the part `Group` if the hit
-  is a sub-mesh).
-- **Build progress:** show parts whose `userData.startingBuildingStep <= currentStep`;
-  animate `currentStep` from 0 → `model.numSteps`.
+- **Hotspots:** raycast against the brick meshes; read the part number from the
+  nearest ancestor group's `userData.fileName`, its colour from `userData.colorCode`,
+  and its step from `userData.buildingStep`. Join to the CSV for set quantities.
+- **Isolate / colour-by:** `model.bricks` already groups every brick with its step —
+  tint by `step` for a build-order heatmap, or filter by `group.userData.fileName`
+  / `colorCode` to isolate a part type or colour.
