@@ -7,7 +7,8 @@ import * as THREE from 'three';
 // Both operate on the ~1,255 "brick groups" — the outermost Object3D whose
 // userData.fileName is a .dat part (nested sub-parts move/hide with their brick).
 
-const EXPLODE_SCALE = 0.6;   // at 100%, a brick moves ~0.6× its distance-from-centre
+const EXPLODE_SCALE = 1.5;   // at 100%, a brick moves ~1.5× its distance-from-centre
+const EXPLODE_BASE = 45;     // + a constant push (LDU) so axis-hugging bricks also separate
 const VERTICAL_BIAS = 0.4;   // how much bricks also fan out along the rocket axis
 const PLAY_SECONDS = 22;     // duration of the "Play build" animation
 
@@ -48,6 +49,14 @@ export function initFeatures(model) {
     group.parent.getWorldQuaternion(q).invert();
     const localDir = worldDir.applyQuaternion(q);
 
+    // Full displacement at 100% = proportional part + a constant push along the
+    // same direction (so bricks near the axis, whose localDir is tiny, still move).
+    const len = localDir.length();
+    if (len > 1e-4) {
+      const unit = localDir.clone().divideScalar(len);
+      localDir.multiplyScalar(EXPLODE_SCALE).addScaledVector(unit, EXPLODE_BASE);
+    }
+
     return { group, step, home: group.position.clone(), dir: localDir };
   });
 
@@ -55,7 +64,8 @@ export function initFeatures(model) {
   model.maxStep = maxStep;
 
   function setExplode(amount) {
-    for (const e of entries) e.group.position.copy(e.home).addScaledVector(e.dir, amount * EXPLODE_SCALE);
+    // e.dir already encodes the full 100% displacement; just scale by the slider.
+    for (const e of entries) e.group.position.copy(e.home).addScaledVector(e.dir, amount);
   }
   function setStep(step) {
     for (const e of entries) e.group.visible = e.step <= step;
