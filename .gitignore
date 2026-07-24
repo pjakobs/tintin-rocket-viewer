@@ -4,10 +4,11 @@ dist/
 .DS_Store
 
 # The full LDraw parts library (~820 MB) is a downloaded build dependency, not
-# source. See README (Setup) to regenerate it, or run scripts/prune-library.mjs
-# to keep only the ~few-hundred parts this model actually uses.
+# source. Kept OUTSIDE public/ so `vite build` never copies it into dist/ — see
+# README (Setup) to regenerate it, or run scripts/prune-library.mjs to shrink it
+# to the ~few-hundred parts this model actually uses.
 # The committed slim library public/ldraw-min/ is kept (it's what the app runs on).
-public/ldraw/
+/ldraw-library/
 
 # Large source PDF (41 MB building manual) — not needed to build or run.
 references/*.pdf

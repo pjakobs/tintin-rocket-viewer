@@ -121,6 +121,7 @@ export function initFeatures(model) {
       stepEl.value = String(s);
       setStep(s);
       updateStepLabel(s);
+      model.onFeatureChange?.(); // let state.js debounce-persist the step as it plays
       if (s >= maxStep) { stopPlay(); return; }
       playRAF = requestAnimationFrame(tick);
     };

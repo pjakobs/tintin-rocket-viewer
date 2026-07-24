@@ -5,6 +5,7 @@ import { LDrawConditionalLineMaterial } from 'three/addons/materials/LDrawCondit
 import { crossCheck } from './crosscheck.js';
 import { initFeatures } from './features.js';
 import { initHotspots } from './hotspots.js';
+import { initStateSync } from './state.js';
 
 const MODEL_URL = '/model/tintin-rocket.ldr';
 // Slim LDraw library holding only the ~535 parts/primitives this model uses
@@ -145,6 +146,7 @@ function onModelLoaded(group, modelText) {
   updateHUD();
   initFeatures(model);
   initHotspots({ THREE, scene, camera, renderer, controls, model, libraryPath: LIBRARY_PATH });
+  initStateSync({ model, camera, controls });
 
   statusEl.textContent = 'Ready';
   loadingEl.classList.add('hidden');

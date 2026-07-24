@@ -131,7 +131,27 @@ export function initHotspots({ THREE: _THREE, scene, camera, renderer, model, li
 
   function hidePanel() { panel.classList.add('hidden'); }
 
-  function deselect() { clearHighlight(); hidePanel(); }
+  function firstMesh(group) {
+    let m = null;
+    group.traverse((o) => { if (!m && o.isMesh) m = o; });
+    return m;
+  }
+
+  // Select a brick programmatically (used by clicks and by state.js restoring a
+  // deep-linked selection). Tracks selectedIndex so the URL can reference it.
+  function selectBrick(brick) {
+    highlight(brick);
+    showPanel(brick, firstMesh(brick.group));
+    model.selectedIndex = model.bricks.indexOf(brick);
+    model.onSelectionChange?.();
+  }
+
+  function deselect() {
+    clearHighlight();
+    hidePanel();
+    model.selectedIndex = null;
+    model.onSelectionChange?.();
+  }
 
   // ---- picking -------------------------------------------------------------
   function pick(clientX, clientY) {
@@ -156,7 +176,7 @@ export function initHotspots({ THREE: _THREE, scene, camera, renderer, model, li
     down = null;
     if (moved > DRAG_THRESHOLD) return;
     const res = pick(e.clientX, e.clientY);
-    if (res) { highlight(res.brick); showPanel(res.brick, res.mesh); }
+    if (res) selectBrick(res.brick);
     else deselect();
   });
 
@@ -173,7 +193,9 @@ export function initHotspots({ THREE: _THREE, scene, camera, renderer, model, li
   el('ins-close').addEventListener('click', deselect);
   window.addEventListener('keydown', (e) => { if (e.key === 'Escape') deselect(); });
 
-  // expose for console / other features
-  model.selectBrick = highlight;
+  // expose for console / other features (also used by state.js to restore a
+  // deep-linked selection)
+  model.selectedIndex = null;
+  model.selectBrick = selectBrick;
   model.deselect = deselect;
 }

@@ -1,18 +1,18 @@
-// Shrink public/ldraw from the full ~820 MB library to only the parts this model
+// Shrink the full ~820 MB LDraw library (kept OUTSIDE public/, at ldraw-library/,
+// so `vite build` never copies it into dist/) down to only the parts this model
 // actually references (plus their recursive sub-parts and primitives).
 //
 //   node scripts/prune-library.mjs           # dry run: report what would be kept
 //   node scripts/prune-library.mjs --apply   # copy the needed subset to public/ldraw-min
 //
-// After --apply, point the viewer at the slim library by changing LIBRARY_PATH
-// in src/main.js to '/ldraw-min/' (and move/rename as you like).
+// public/ldraw-min/ IS served (and committed) — it's what the app runs on.
 
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const LIB = path.join(root, 'public/ldraw');
+const LIB = path.join(root, 'ldraw-library');
 const OUT = path.join(root, 'public/ldraw-min');
 const MODEL = path.join(root, 'public/model/tintin-rocket.ldr');
 const apply = process.argv.includes('--apply');

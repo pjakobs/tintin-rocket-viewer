@@ -130,13 +130,14 @@ The **+28** difference is not an error — it's cataloguing differences:
 
 ## Parts library
 
-`public/ldraw-min/` is generated, not authored. To rebuild or use the full library:
+`public/ldraw-min/` is generated, not authored. To rebuild it:
 
 ```bash
-# 1. Download the official (and optionally unofficial) LDraw library:
+# 1. Download the official (and optionally unofficial) LDraw library, and extract
+#    it to ldraw-library/ at the repo root (NOT under public/ — see note below):
 #    https://library.ldraw.org/library/updates/complete.zip      (~142 MB)
 #    https://library.ldraw.org/library/unofficial/ldrawunf.zip    (~90 MB, adds 7547/7217)
-#    Extract/merge so you have public/ldraw/{parts,p,LDConfig.ldr,...}
+#    Extract/merge so you have ldraw-library/{parts,p,LDConfig.ldr,...}
 
 # 2. Add the Studio custom parts (bl_8097 nose cone, bl_98138pb459 tile):
 node scripts/extract-custom-parts.mjs     # pulls geometry from the .io export
@@ -145,12 +146,11 @@ node scripts/extract-custom-parts.mjs     # pulls geometry from the .io export
 node scripts/prune-library.mjs --apply    # writes public/ldraw-min/
 ```
 
-To render against the full library instead, set `LIBRARY_PATH = '/ldraw/'` in
-`src/main.js`.
-
-> Note: `npm run build` copies everything in `public/` into `dist/`. With the slim
-> library that's fine; with the full ~820 MB library, prune first or serve the
-> library separately.
+> **Keep the full library out of `public/`.** `vite build` copies everything
+> under `public/` into `dist/` verbatim (that's the whole point of `publicDir`),
+> so an ~820 MB library sitting in `public/ldraw/` turns a 3 MB deploy into a
+> ~950 MB one. `ldraw-library/` at the repo root is gitignored and only ever
+> used as the prune script's *source* — nothing reads from it at runtime.
 
 ## Interactive features (`src/features.js`)
 
@@ -179,6 +179,14 @@ brick). `initFeatures()` collects exactly 1,255 of them and stores
   scrubber (step-hidden bricks aren't pickable) and works in the exploded state.
   Pointer-drag is distinguished from a click so orbiting never selects. `Esc` /
   click-empty deselects.
+
+- **Shareable links** (`src/state.js`) — explode amount, build step, selected part,
+  and camera position/target are deep-linked into the URL hash (e.g.
+  `#e=35&s=200&p=300&cx=527&cy=154&cz=2604&tx=0&ty=0&tz=0`), debounced so normal
+  interaction doesn't spam `history.replaceState`. Only keys that differ from the
+  default view are written, so a plain visit keeps a clean URL. *Copy link* flushes
+  and copies the current view immediately. Opening a copied link restores explode,
+  step, selection (incl. the inspect panel), and camera exactly.
 
 ## Extending it further
 
