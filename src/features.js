@@ -27,13 +27,18 @@ export function initFeatures(model) {
   const root = model.root;
   const bricks = collectBricks(root);
 
+  root.updateMatrixWorld(true); // ensure world matrices are current for bbox maths
   const center = new THREE.Box3().setFromObject(root).getCenter(new THREE.Vector3());
   const wp = new THREE.Vector3();
   const q = new THREE.Quaternion();
+  const bbox = new THREE.Box3();
 
   let maxStep = 0;
   const entries = bricks.map((group) => {
-    group.getWorldPosition(wp);
+    // Use the brick's geometric centre (world bbox centre), not its group origin.
+    // Big parts like the nose cones have their LDraw origin offset from where the
+    // geometry actually sits, which would skew the radial explode direction.
+    bbox.setFromObject(group).getCenter(wp);
     const step = group.userData.buildingStep | 0;
     maxStep = Math.max(maxStep, step);
 
