@@ -4,6 +4,7 @@ import { LDrawLoader } from 'three/addons/loaders/LDrawLoader.js';
 import { LDrawConditionalLineMaterial } from 'three/addons/materials/LDrawConditionalLineMaterial.js';
 import { crossCheck } from './crosscheck.js';
 import { initFeatures } from './features.js';
+import { initHotspots } from './hotspots.js';
 
 const MODEL_URL = '/model/tintin-rocket.ldr';
 // Slim LDraw library holding only the ~535 parts/primitives this model uses
@@ -143,6 +144,7 @@ function onModelLoaded(group, modelText) {
   frameModel(group);
   updateHUD();
   initFeatures(model);
+  initHotspots({ THREE, scene, camera, renderer, controls, model, libraryPath: LIBRARY_PATH });
 
   statusEl.textContent = 'Ready';
   loadingEl.classList.add('hidden');

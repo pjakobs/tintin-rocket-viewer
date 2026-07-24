@@ -171,13 +171,22 @@ brick). `initFeatures()` collects exactly 1,255 of them and stores
 `model.bricks = [{ group, step, home, dir }]`, plus `model.setExplode(0..1)` and
 `model.setStep(n)` for the console.
 
-## Extending it further (hotspots)
+- **Click-to-inspect hotspots** (`src/hotspots.js`) — click any brick to select it.
+  A raycast against the brick meshes resolves the hit back to its brick group; the
+  part glows (cloned emissive material) inside a highlight box, and a panel shows
+  the part number, human-readable description (lazy-fetched from the `.dat`), colour
+  swatch + name, build step, and how many of that part the build uses. Respects the
+  scrubber (step-hidden bricks aren't pickable) and works in the exploded state.
+  Pointer-drag is distinguished from a click so orbiting never selects. `Esc` /
+  click-empty deselects.
 
-`window.viewer` exposes `{ THREE, scene, camera, renderer, controls, model }`.
+## Extending it further
 
-- **Hotspots:** raycast against the brick meshes; read the part number from the
-  nearest ancestor group's `userData.fileName`, its colour from `userData.colorCode`,
-  and its step from `userData.buildingStep`. Join to the CSV for set quantities.
-- **Isolate / colour-by:** `model.bricks` already groups every brick with its step —
+`window.viewer` exposes `{ THREE, scene, camera, renderer, controls, model }`, and
+`model` now also carries `selectBrick(brick)` / `deselect()`.
+
+- **Isolate / colour-by:** `model.bricks` groups every brick with its step —
   tint by `step` for a build-order heatmap, or filter by `group.userData.fileName`
   / `colorCode` to isolate a part type or colour.
+- **Inventory linking:** join the selected part number to `src/crosscheck.js`'s CSV
+  data to show set-level quantities / spares alongside the in-build count.
