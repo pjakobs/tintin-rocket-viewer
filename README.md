@@ -68,6 +68,16 @@ Studio embeds their real geometry in the `.io` export (`model2.ldr`), so
 `scripts/extract-custom-parts.mjs` pulls it out into
 `public/ldraw*/parts/bl_*.dat`. Net result: **0 missing parts.**
 
+> ⚠️ **The `.io` layout shifts between Studio versions.** In 2.26.3 both custom
+> parts were inline MPD sections named after the part (`0 FILE 8097.dat`). By
+> 2.26.6 the cone had become `0 FILE rename_bl_8097.dat` and the printed tile's
+> geometry had moved out into `s/bl_98138pb459_0.dat` + `_1.dat`, leaving the
+> section holding only type-1 references. The extract script now normalises the
+> `rename_`/`bl_`/`s/` prefixes and flattens sub-references (applying their
+> transform, and reversing winding on a mirroring one). It also **exits non-zero
+> rather than writing a header-only `.dat`** — that failure mode renders as an
+> invisible part, which is very easy to miss.
+
 > ⚠️ **BrickLink numbers collide with LDraw numbers.** Don't alias `bl_8097` to
 > LDraw's `8097.dat`: LDraw `8097` is a "Panel Cone 4×8×8", but BrickLink 8097 is
 > a different shape ("Cone Half 4×8×8") with a different local origin. Aliasing to
