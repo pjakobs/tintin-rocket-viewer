@@ -254,6 +254,18 @@ and `model.setStep(n)` for the console.
   Pointer-drag is distinguished from a click so orbiting never selects. `Esc` /
   click-empty deselects.
 
+- **Recentre** (`R`, or the *⌖ Recentre* button) — undoes panning. Right-drag pan
+  slides the camera *and* the orbit target together, so afterwards OrbitControls
+  pivots about wherever the target landed, off the rocket's axis by however far
+  you panned — the model appears to swing around a point outside itself. Because
+  the target is persisted in the URL hash, a stray pan also survives a reload and
+  looks permanent. `recentre()` moves both back by the same delta, restoring the
+  rocket to the centre of the view and the pivot to its axis, while leaving the
+  current zoom and orbit angle untouched.
+
+  > This is distinct from the bbox-centre bug fixed in `axisOfSymmetry()` — that
+  > one was wrong on a *fresh* load; this one only appears after you pan.
+
 - **Shareable links** (`src/state.js`) — explode amount, build step, selected part,
   hidden bricks, and camera position/target are deep-linked into the URL hash (e.g.
   `#e=35&s=200&p=300&h=41,88&cx=527&cy=154&cz=2604&tx=0&ty=0&tz=0`), debounced so

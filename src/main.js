@@ -41,6 +41,12 @@ controls.dampingFactor = 0.08;
 controls.minDistance = 40;
 controls.maxDistance = 4000;   // provisional; frameModel() refits it to the model
 
+// The pivot frameModel() parks the model on: the rocket's axis at its mid-height.
+// frameModel() moves the model onto this point, so it is simply the origin.
+// Declared here rather than beside frameModel() so it is initialised before the
+// top-level loader.parse() below, which can call frameModel() via its callback.
+const HOME_TARGET = new THREE.Vector3(0, 0, 0);
+
 // Lighting — a soft studio setup so bricks read clearly from any angle.
 scene.add(new THREE.HemisphereLight(0xffffff, 0x333844, 1.6));
 const key = new THREE.DirectionalLight(0xffffff, 2.2);
@@ -195,9 +201,34 @@ function frameModel(object) {
   // assembled one — at the Explode slider's 300% each brick travels several times
   // its distance from the centre, so the assembled fit distance is nowhere near enough.
   controls.maxDistance = dist * 6;
-  controls.target.set(0, 0, 0);
+  controls.target.copy(HOME_TARGET);
   controls.update();
 }
+
+// Undo panning.
+//
+// Right-drag pan slides the camera and the orbit target together, so afterwards
+// OrbitControls pivots about wherever the target landed — off the rocket's axis
+// by however far you panned, which reads as the model swinging around a point
+// outside itself. state.js persists the target in the URL hash, so a stray pan
+// also survives a reload and looks permanent.
+//
+// Moving both back by the same delta exactly reverses that: the rocket returns
+// to the centre of the view and the pivot returns to its axis, while the current
+// zoom and orbit angle are left untouched.
+function recentre() {
+  const delta = controls.target.clone().sub(HOME_TARGET);
+  if (delta.lengthSq() === 0) return;
+  camera.position.sub(delta);
+  controls.target.copy(HOME_TARGET);
+  controls.update(); // fires 'change', so state.js persists the corrected target
+}
+
+document.getElementById('recentre').addEventListener('click', recentre);
+window.addEventListener('keydown', (e) => {
+  if (e.target instanceof HTMLInputElement) return; // don't steal slider keys
+  if (e.key.toLowerCase() === 'r' && !e.metaKey && !e.ctrlKey && !e.altKey) recentre();
+});
 
 function updateHUD() {
   document.getElementById('stat-parts').textContent = model.parts.length.toLocaleString();
