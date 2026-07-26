@@ -38,7 +38,7 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 controls.minDistance = 40;
-controls.maxDistance = 4000;
+controls.maxDistance = 4000;   // provisional; frameModel() refits it to the model
 
 // Lighting — a soft studio setup so bricks read clearly from any angle.
 scene.add(new THREE.HemisphereLight(0xffffff, 0x333844, 1.6));
@@ -179,6 +179,11 @@ function frameModel(object) {
   camera.near = radius / 100;
   camera.far = radius * 100;
   camera.updateProjectionMatrix();
+
+  // Leave room to pull back far enough to frame the *exploded* model, not just the
+  // assembled one — at the Explode slider's 300% each brick travels several times
+  // its distance from the centre, so the assembled fit distance is nowhere near enough.
+  controls.maxDistance = dist * 6;
   controls.target.set(0, 0, 0);
   controls.update();
 }

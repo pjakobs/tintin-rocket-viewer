@@ -206,7 +206,8 @@ node scripts/prune-library.mjs --apply    # writes public/ldraw-min/
 The bottom control bar drives two features off the per-part LDraw metadata:
 
 - **Exploded view** — the *Explode* slider slides every brick radially away from
-  the rocket's axis (0–100%). Each of the 1,181 brick groups gets a pre-computed
+  the rocket's axis (0–300%; 100% is "each brick moves ~1.5× its distance from the
+  centre, plus a 45 LDU push"). Each of the 1,181 brick groups gets a pre-computed
   local displacement vector, so the update is one `copy + addScaledVector` per
   brick.
 - **Build scrubber + Play** — the *Build step* slider reveals bricks up to a given

@@ -69,7 +69,9 @@ export function initFeatures(model) {
   model.maxStep = maxStep;
 
   function setExplode(amount) {
-    // e.dir already encodes the full 100% displacement; just scale by the slider.
+    // e.dir already encodes the displacement at 100%; just scale by the slider.
+    // The slider runs to 300%, so `amount` is 0..3 — nothing here caps it, and
+    // the console can push it further still.
     for (const e of entries) e.group.position.copy(e.home).addScaledVector(e.dir, amount);
   }
   function setStep(step) {
