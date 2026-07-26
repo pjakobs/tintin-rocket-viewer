@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { axisOfSymmetry } from './geometry.js';
 
 // Interactive features driven off the per-part LDraw metadata:
 //  - Exploded view   : each brick slides radially away from the rocket's axis.
@@ -28,7 +29,14 @@ export function initFeatures(model) {
   const bricks = collectBricks(root);
 
   root.updateMatrixWorld(true); // ensure world matrices are current for bbox maths
-  const center = new THREE.Box3().setFromObject(root).getCenter(new THREE.Vector3());
+
+  // Explode radially from the rocket's AXIS, not the bbox centre — the splayed
+  // landing legs pull the latter ~53 LDU sideways (see axisOfSymmetry in
+  // main.js), which would fan one side of every ring further than the other.
+  // Vertical fanning still uses the bbox mid-height, which is what "middle of
+  // the model, top to bottom" should mean.
+  const center = axisOfSymmetry(root);
+  center.y = new THREE.Box3().setFromObject(root).getCenter(new THREE.Vector3()).y;
   const wp = new THREE.Vector3();
   const q = new THREE.Quaternion();
   const bbox = new THREE.Box3();

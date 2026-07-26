@@ -6,6 +6,7 @@ import { crossCheck } from './crosscheck.js';
 import { initFeatures } from './features.js';
 import { initHotspots } from './hotspots.js';
 import { initStateSync } from './state.js';
+import { axisOfSymmetry } from './geometry.js';
 
 const MODEL_URL = '/model/tintin-rocket.ldr';
 // Slim LDraw library holding only the ~535 parts/primitives this model uses
@@ -169,11 +170,21 @@ function onModelLoaded(group, modelText) {
 // Center the model at the origin and fit the camera to its bounding sphere.
 function frameModel(object) {
   const box = new THREE.Box3().setFromObject(object);
-  const size = box.getSize(new THREE.Vector3());
   const center = box.getCenter(new THREE.Vector3());
-  object.position.sub(center); // recenter to origin
+  const axis = axisOfSymmetry(object);
 
-  const radius = size.length() / 2;
+  // Sit the model's axis on the world Y axis, and its mid-height at y=0, so the
+  // orbit target below is a pivot that runs straight up through the rocket.
+  object.position.sub(new THREE.Vector3(axis.x, center.y, axis.z));
+
+  // Enclosing radius about the new origin. Measured from the re-centred box
+  // rather than from size.length()/2, because shifting to the axis (not the bbox
+  // centre) leaves the box slightly lopsided — the legs now reach further on one
+  // side, and framing has to cover that longer reach.
+  object.updateMatrixWorld(true);
+  const shifted = new THREE.Box3().setFromObject(object);
+  const radius = Math.max(shifted.max.length(), shifted.min.length());
+
   const dist = radius / Math.sin((camera.fov * Math.PI) / 180 / 2);
   camera.position.set(dist * 0.6, dist * 0.45, dist * 0.75);
   camera.near = radius / 100;
