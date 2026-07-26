@@ -218,8 +218,22 @@ The bottom control bar drives two features off the per-part LDraw metadata:
 Both work on **brick groups** — the outermost `Object3D` whose
 `userData.fileName` is a `.dat` part (nested sub-parts move/hide with their
 brick). `initFeatures()` collects exactly 1,181 of them and stores
-`model.bricks = [{ group, step, home, dir }]`, plus `model.setExplode(0..1)` and
-`model.setStep(n)` for the console.
+`model.bricks = [{ group, step, home, dir, hidden }]`, plus `model.setExplode(0..3)`
+and `model.setStep(n)` for the console.
+
+- **Hide individual bricks** — select a brick and press `H` (or click *Hide brick*
+  in the inspect panel) to take it out of the scene, so you can peel off a panel and
+  click whatever was behind it. A `↺ Show all (N)` chip appears in the control bar
+  while anything is hidden; `U` (or `Cmd`/`Ctrl+Z`) un-hides the most recent one.
+  The restore controls have to live outside the 3D view, because a hidden brick is
+  deliberately not pickable.
+
+  > ⚠️ **`group.visible` has exactly one writer: `applyVisibility()`.** Two
+  > independent things suppress a brick — the step scrubber and the per-brick hide —
+  > so hidden-ness is a *flag* that ANDs with the step test
+  > (`visible = step <= currentStep && !hidden`). Setting `visible = false` directly
+  > to hide a brick looks fine until the next scrubber tick or `Play build` frame
+  > resurrects it.
 
 - **Click-to-inspect hotspots** (`src/hotspots.js`) — click any brick to select it.
   A raycast against the brick meshes resolves the hit back to its brick group; the
@@ -231,12 +245,18 @@ brick). `initFeatures()` collects exactly 1,181 of them and stores
   click-empty deselects.
 
 - **Shareable links** (`src/state.js`) — explode amount, build step, selected part,
-  and camera position/target are deep-linked into the URL hash (e.g.
-  `#e=35&s=200&p=300&cx=527&cy=154&cz=2604&tx=0&ty=0&tz=0`), debounced so normal
-  interaction doesn't spam `history.replaceState`. Only keys that differ from the
-  default view are written, so a plain visit keeps a clean URL. *Copy link* flushes
-  and copies the current view immediately. Opening a copied link restores explode,
-  step, selection (incl. the inspect panel), and camera exactly.
+  hidden bricks, and camera position/target are deep-linked into the URL hash (e.g.
+  `#e=35&s=200&p=300&h=41,88&cx=527&cy=154&cz=2604&tx=0&ty=0&tz=0`), debounced so
+  normal interaction doesn't spam `history.replaceState`. Only keys that differ from
+  the default view are written, so a plain visit keeps a clean URL. *Copy link*
+  flushes and copies the current view immediately. Opening a copied link restores
+  explode, step, hidden set, selection (incl. the inspect panel), and camera exactly.
+  `h=` is applied before `p=`, so a brick that's both hidden and selected stays
+  hidden rather than showing an info panel for something invisible.
+
+  > `p=` and `h=` are **positional indices** into `model.bricks`, so links break if
+  > the model file changes (as it did when the minifig gear was split out). Out-of-range
+  > indices are ignored rather than throwing.
 
 ## Deploying
 

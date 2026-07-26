@@ -1,7 +1,7 @@
 // Deep-links the viewer's interactive state (explode amount, build step, camera,
 // selected brick) into the URL hash, so any view is a shareable / bookmarkable /
 // refresh-safe link. Format is a short "&"-joined key=value string, e.g.
-//   #e=40&s=180&p=612&cx=120&cy=340&cz=560&tx=0&ty=80&tz=0
+//   #e=40&s=180&p=612&h=41,88&cx=120&cy=340&cz=560&tx=0&ty=80&tz=0
 // Only keys that differ from the default view are written, so a plain visit
 // keeps a clean URL.
 
@@ -49,6 +49,7 @@ export function initStateSync({ model, camera, controls }) {
     if (explodeEl.valueAsNumber > 0) s.e = explodeEl.valueAsNumber;
     if (stepEl.valueAsNumber < model.maxStep) s.s = stepEl.valueAsNumber;
     if (model.selectedIndex != null) s.p = model.selectedIndex;
+    if (model.hiddenIndices.length) s.h = model.hiddenIndices.join(',');
     if (cameraTouched) {
       s.cx = round(camera.position.x); s.cy = round(camera.position.y); s.cz = round(camera.position.z);
       s.tx = round(controls.target.x); s.ty = round(controls.target.y); s.tz = round(controls.target.z);
@@ -79,9 +80,17 @@ export function initStateSync({ model, camera, controls }) {
     controls.update();
     cameraTouched = true;
   }
+  // Hidden bricks before the selection: a brick that's both hidden and selected is
+  // contradictory (you'd get an info panel for something invisible), so hidden wins.
+  if (initial.h != null) {
+    for (const i of initial.h.split(',')) {
+      const brick = model.bricks[+i];
+      if (brick) model.setHidden(brick, true);
+    }
+  }
   if (initial.p != null) {
     const brick = model.bricks[+initial.p];
-    if (brick) model.selectBrick(brick);
+    if (brick && !brick.hidden) model.selectBrick(brick);
   }
   restoring = false;
 

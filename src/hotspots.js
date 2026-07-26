@@ -190,8 +190,23 @@ export function initHotspots({ THREE: _THREE, scene, camera, renderer, model, li
     dom.style.cursor = pick(e.clientX, e.clientY) ? 'pointer' : '';
   });
 
+  // Hide the selected brick. deselect() must run FIRST: it restores the saved
+  // materials and unparents the highlight box. Skipping it would leave the
+  // emissive clones installed (and leaked) on a brick you can no longer click.
+  function hideSelected() {
+    if (!selected) return;
+    const brick = selected;
+    deselect();
+    model.setHidden(brick, true);
+  }
+
   el('ins-close').addEventListener('click', deselect);
-  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') deselect(); });
+  el('ins-hide').addEventListener('click', hideSelected);
+  window.addEventListener('keydown', (e) => {
+    if (e.target instanceof HTMLInputElement) return;
+    if (e.key === 'Escape') deselect();
+    else if (e.key.toLowerCase() === 'h' && !e.metaKey && !e.ctrlKey && !e.altKey) hideSelected();
+  });
 
   // expose for console / other features (also used by state.js to restore a
   // deep-linked selection)

@@ -62,7 +62,7 @@ export function initFeatures(model) {
       localDir.multiplyScalar(EXPLODE_SCALE).addScaledVector(unit, EXPLODE_BASE);
     }
 
-    return { group, step, home: group.position.clone(), dir: localDir };
+    return { group, step, home: group.position.clone(), dir: localDir, hidden: false };
   });
 
   model.bricks = entries;
@@ -74,8 +74,46 @@ export function initFeatures(model) {
     // the console can push it further still.
     for (const e of entries) e.group.position.copy(e.home).addScaledVector(e.dir, amount);
   }
+  // ---- visibility ----------------------------------------------------------
+  // Two independent things suppress a brick: the build-step scrubber and the
+  // per-brick hide. They must not fight, so this is the ONLY writer of
+  // group.visible — anything that changes either input calls it.
+  let currentStep = maxStep;
+  function applyVisibility() {
+    for (const e of entries) e.group.visible = e.step <= currentStep && !e.hidden;
+  }
   function setStep(step) {
-    for (const e of entries) e.group.visible = e.step <= step;
+    currentStep = step;
+    applyVisibility();
+  }
+
+  // Hidden bricks, most-recent-last, so `U` can walk back out of a peel.
+  const hiddenStack = [];
+
+  function setHidden(brick, flag) {
+    if (!brick || !!brick.hidden === !!flag) return;
+    brick.hidden = !!flag;
+    if (flag) hiddenStack.push(brick);
+    else hiddenStack.splice(hiddenStack.indexOf(brick), 1);
+    afterHiddenChange();
+  }
+  function unhideLast() {
+    const brick = hiddenStack.pop();
+    if (!brick) return;
+    brick.hidden = false;
+    afterHiddenChange();
+  }
+  function showAllHidden() {
+    if (!hiddenStack.length) return;
+    for (const e of hiddenStack) e.hidden = false;
+    hiddenStack.length = 0;
+    afterHiddenChange();
+  }
+  function afterHiddenChange() {
+    applyVisibility();
+    updateStepLabel(currentStep);
+    updateShowAllBtn();
+    model.onFeatureChange?.(); // persist to the URL hash
   }
 
   // ---- UI wiring -----------------------------------------------------------
@@ -85,15 +123,26 @@ export function initFeatures(model) {
   const stepEl = document.getElementById('step');
   const stepVal = document.getElementById('step-val');
   const playBtn = document.getElementById('play');
+  const showAllBtn = document.getElementById('show-all');
 
   stepEl.max = String(maxStep);
   stepEl.value = String(maxStep);
 
   function updateStepLabel(step) {
-    const visible = entries.reduce((n, e) => n + (e.step <= step ? 1 : 0), 0);
-    stepVal.textContent = step >= maxStep ? `all · ${maxStep}` : `${step} / ${maxStep} · ${visible} bricks`;
+    // Count what's actually on screen, so hidden bricks don't inflate the total.
+    const visible = entries.reduce((n, e) => n + (e.step <= step && !e.hidden ? 1 : 0), 0);
+    const suffix = hiddenStack.length ? ` · ${hiddenStack.length} hidden` : '';
+    stepVal.textContent = step >= maxStep
+      ? `all · ${maxStep}${suffix}`
+      : `${step} / ${maxStep} · ${visible} bricks${suffix}`;
+  }
+  function updateShowAllBtn() {
+    const n = hiddenStack.length;
+    showAllBtn.textContent = `↺ Show all (${n})`;
+    showAllBtn.classList.toggle('gone', n === 0);
   }
   updateStepLabel(maxStep);
+  updateShowAllBtn();
 
   explodeEl.addEventListener('input', () => {
     const a = explodeEl.valueAsNumber / 100;
@@ -131,9 +180,29 @@ export function initFeatures(model) {
   }
   playBtn.addEventListener('click', () => (playRAF == null ? startPlay() : stopPlay()));
 
+  // ---- hide / restore ------------------------------------------------------
+  showAllBtn.addEventListener('click', showAllHidden);
+
+  // A hidden brick can't be clicked (hotspots.js skips invisible bricks), so
+  // un-hiding has to come from here: `U`, or Cmd/Ctrl+Z for the usual reflex.
+  window.addEventListener('keydown', (e) => {
+    if (e.target instanceof HTMLInputElement) return; // don't steal slider keys
+    const undoChord = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z';
+    if (!undoChord && (e.key.toLowerCase() !== 'u' || e.metaKey || e.ctrlKey || e.altKey)) return;
+    if (undoChord) e.preventDefault(); // don't fall through to browser undo
+    unhideLast();
+  });
+
   panel.classList.add('ready');
 
-  // Expose for the console / future features.
+  // Expose for the console / other modules (hotspots.js hides the selected
+  // brick; state.js serialises the hidden set into the URL).
   model.setExplode = setExplode;
   model.setStep = setStep;
+  model.setHidden = setHidden;
+  model.unhideLast = unhideLast;
+  model.showAllHidden = showAllHidden;
+  Object.defineProperty(model, 'hiddenIndices', {
+    get: () => hiddenStack.map((b) => entries.indexOf(b)),
+  });
 }
