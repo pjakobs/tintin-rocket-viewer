@@ -1,6 +1,7 @@
 # Tintin Moon Rocket — 3D Digital Twin
 
-A Three.js web viewer for the LEGO **21367 Tintin Moon Rocket** (1,255 bricks),
+A Three.js web viewer for the LEGO **21367 Tintin Moon Rocket** (1,255 bricks in
+the set, **1,181 rendered** — see [Loose minifig gear](#loose-minifig-gear)),
 rendered directly from an LDraw model exported by BrickLink Studio. Orbit / zoom /
 pan controls, built to be extended with clickable part hotspots and a build-progress
 animation.
@@ -18,7 +19,7 @@ npm run dev        # http://localhost:5173  (or the port Vite prints)
 ```
 
 The repo ships with a **slim LDraw parts library** (`public/ldraw-min/`, ~2.7 MB)
-containing only the ~535 parts and primitives this model actually uses, so it
+containing only the ~529 parts and primitives this model actually uses, so it
 works out of the box. See [Parts library](#parts-library) to regenerate or use
 the full library.
 
@@ -27,7 +28,7 @@ the full library.
 ```
 public/
   model/
-    tintin-rocket.ldr          # the model (copied from references/, MPD w/ 37 submodels)
+    tintin-rocket.ldr          # the model (derived from references/, MPD w/ 35 submodels)
     rebrickable_parts.csv      # manual-derived parts list, for the sanity check
   ldraw-min/                   # slim LDraw library (parts/, p/, LDConfig.ldr)
 src/
@@ -35,7 +36,9 @@ src/
   crosscheck.js                # LDR↔CSV part-count reconciliation
 scripts/
   prune-library.mjs            # build the slim library from the full one
+  strip-loose-elements.mjs     # split the export into rocket + minifig gear
 references/                    # original source files (untouched)
+  minifig-gear.ldr             # the 74 loose bricks, split out for later use
 ```
 
 ## The investigation: LDrawLoader vs. a Blender pipeline
@@ -51,8 +54,8 @@ Blender → glTF conversion if it hit real limitations.
 
 `LDrawLoader` doesn't ship the LEGO parts library; you supply it. Studio models
 can also reference parts that aren't in the official library. I expanded the MPD
-(37 submodels, resolved recursively) to **133 unique parts** and checked each
-against the downloaded library:
+of the full 1,255-brick export (37 submodels, resolved recursively) to
+**133 unique parts** and checked each against the downloaded library:
 
 | Source | Result |
 | --- | --- |
@@ -74,7 +77,7 @@ Studio embeds their real geometry in the `.io` export (`model2.ldr`), so
 
 ### Performance
 
-~1,255 bricks → 1,319 meshes, ~703k triangles, ~3,900 draw calls. Renders at
+1,181 bricks → 1,228 meshes, ~674k triangles, ~3,630 draw calls. Renders at
 60 fps as separate per-part meshes on a normal desktop GPU. No merging needed
 (and merging would be counterproductive here — see next section).
 
@@ -86,7 +89,7 @@ material-batched meshes. That throws away exactly what the planned features need
 - **Per-part identity** — every brick stays its own `Object3D` with its LDraw
   part number in `userData.fileName`, so hotspots are just a raycast away.
 - **Build steps** — the loader parses the `0 STEP` metas: `root.userData.numBuildingSteps`
-  is **360**, and each part group carries `userData.buildingStep` /
+  is **348**, and each part group carries `userData.buildingStep` /
   `startingBuildingStep`. That's a ready-made timeline for a build animation.
 
 A Blender bake would be the right call if the model were dominated by
@@ -117,11 +120,12 @@ the Three.js version:
 On load the viewer reconciles the rendered model against the manual-derived CSV
 (`src/crosscheck.js`, also logged to the console). Result:
 
-- **LDR model: 1,255 bricks** (matches the file's own `NumOfBricks 1255`), 133 unique parts
+- **LDR model: 1,181 bricks**, 122 unique parts
 - **CSV: 1,283 non-spare bricks**, 148 unique parts
-- **120 part numbers match exactly**, with identical quantities
+- **110 part numbers match exactly**, with identical quantities
 
-The **+28** difference is not an error — it's cataloguing differences:
+The **+102** difference is not an error. **74** of it is the deliberately removed
+minifig gear (below); the remaining **+28** is cataloguing differences:
 
 - **ID scheme:** LDraw vs. BrickLink/Rebrickable numbers for the same part —
   e.g. `3023b`↔`3023` (×105, plate 1×2), `2780`↔`61332` (×17, pin),
@@ -130,6 +134,48 @@ The **+28** difference is not an error — it's cataloguing differences:
   and printed decorations as separate line items (`970c34pr0007`,
   `973c34h34pr0002`, the `28621pr00xx` head prints, …) that the LDraw model
   represents differently or as assemblies. This accounts for the bulk of the gap.
+
+## Loose minifig gear
+
+The set inventory includes gear for five astronaut minifigures that the Studio
+export places on the base plane but **~500 LDU off to the side**, well clear of
+the rocket's own footprint (which ends at `z = -146`; the cluster starts at
+`z = -440`):
+
+| What | Bricks |
+| --- | --- |
+| `stand` submodel — a 380×20 LDU black tile strip the figures stand on | 21 |
+| `backpack` submodel ×5 — one per astronaut | 45 |
+| `61287.dat` ×10 — air tanks, 2 per figure, 80 LDU spacing | 10 |
+| small props (`87994` bar, `48336` handle plate, `3069b`, `3024`, `30162`) | 8 |
+| **Total** | **74** |
+
+Rendered *without* the actual minifigures these read as debris, and being far
+off-axis they cost more than they show:
+
+- They inflate the model bounds from **978 × 1258 × 895** to
+  **625 × 1258 × 550** LDU, pulling the auto-framing camera back so the rocket
+  renders smaller than it needs to.
+- They skew the explode centroid (`src/features.js` derives each brick's
+  displacement from the geometric centre).
+- They occupy build steps 1, 68 and 70, so the build scrubber spends its first
+  and last frames placing parts nobody can interpret.
+
+So the viewer model is the rocket only. `scripts/strip-loose-elements.mjs`
+re-derives both files from the untouched master export, moving everything with
+`z < -350` aside and dropping submodels the rocket no longer references:
+
+```bash
+node scripts/strip-loose-elements.mjs
+#   references/Lego Tintin-Full inventory.ldr: 1255 bricks, 38 blocks
+#     -> public/model/tintin-rocket.ldr: 1181 bricks, 36 blocks
+#     -> references/minifig-gear.ldr:      74 bricks,  3 blocks
+```
+
+`references/minifig-gear.ldr` is a valid standalone MPD, so the gear can be
+dropped back in later (with real minifigures) without re-deriving anything.
+`scripts/prune-library.mjs` seeds from **both** files, so the slim library keeps
+those 16 part geometries available.
 
 ## Parts library
 
@@ -145,7 +191,7 @@ The **+28** difference is not an error — it's cataloguing differences:
 # 2. Add the Studio custom parts (bl_8097 nose cone, bl_98138pb459 tile):
 node scripts/extract-custom-parts.mjs     # pulls geometry from the .io export
 
-# 3. Slim it to just this model's parts (~535 files, ~2.7 MB):
+# 3. Slim it to just this model's parts (~529 files, ~2.7 MB):
 node scripts/prune-library.mjs --apply    # writes public/ldraw-min/
 ```
 
@@ -160,17 +206,17 @@ node scripts/prune-library.mjs --apply    # writes public/ldraw-min/
 The bottom control bar drives two features off the per-part LDraw metadata:
 
 - **Exploded view** — the *Explode* slider slides every brick radially away from
-  the rocket's axis (0–100%). Each of the 1,255 brick groups gets a pre-computed
+  the rocket's axis (0–100%). Each of the 1,181 brick groups gets a pre-computed
   local displacement vector, so the update is one `copy + addScaledVector` per
   brick.
 - **Build scrubber + Play** — the *Build step* slider reveals bricks up to a given
-  LDraw build step (there are **360**, in `userData.buildingStep`); *Play build*
+  LDraw build step (there are **348**, in `userData.buildingStep`); *Play build*
   animates it 0 → end. Mid-build you can see the internal bracing, just like the
   instruction manual.
 
 Both work on **brick groups** — the outermost `Object3D` whose
 `userData.fileName` is a `.dat` part (nested sub-parts move/hide with their
-brick). `initFeatures()` collects exactly 1,255 of them and stores
+brick). `initFeatures()` collects exactly 1,181 of them and stores
 `model.bricks = [{ group, step, home, dir }]`, plus `model.setExplode(0..1)` and
 `model.setStep(n)` for the console.
 

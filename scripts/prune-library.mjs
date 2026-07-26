@@ -14,7 +14,13 @@ import { fileURLToPath } from 'url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const LIB = path.join(root, 'ldraw-library');
 const OUT = path.join(root, 'public/ldraw-min');
-const MODEL = path.join(root, 'public/model/tintin-rocket.ldr');
+// The rocket is what ships; the split-out minifig gear (see
+// scripts/strip-loose-elements.mjs) isn't rendered, but keep its parts in the
+// slim library so it can be dropped back in later without a full re-prune.
+const MODELS = [
+  path.join(root, 'public/model/tintin-rocket.ldr'),
+  path.join(root, 'references/minifig-gear.ldr'),
+];
 const apply = process.argv.includes('--apply');
 
 // Resolve a referenced filename to its on-disk location, mirroring LDrawLoader's
@@ -51,9 +57,12 @@ function walk(name) {
   for (const r of refsOf(path.join(LIB, rel))) walk(r);
 }
 
-// Seed from the model's top-level part references. Submodels are inline in the
-// MPD, so start from every type-1 reference in the model file.
-for (const r of refsOf(MODEL)) walk(r);
+// Seed from the models' top-level part references. Submodels are inline in the
+// MPD, so start from every type-1 reference in the model files.
+for (const model of MODELS) {
+  if (!fs.existsSync(model)) continue;
+  for (const r of refsOf(model)) walk(r);
+}
 // Always keep the colour config.
 if (fs.existsSync(path.join(LIB, 'LDConfig.ldr'))) keep.add('LDConfig.ldr');
 
