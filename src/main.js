@@ -82,6 +82,14 @@ const statusEl = document.getElementById('status');
 const progressEl = document.getElementById('progress');
 const loadingEl = document.getElementById('loading');
 
+function failLoad(err, msg) {
+  console.error(err);
+  loadingEl.classList.add('error');
+  document.getElementById('load-msg').textContent = msg;
+  document.getElementById('load-detail').textContent = String(err?.message ?? err);
+  statusEl.textContent = 'Load failed';
+}
+
 const loader = new LDrawLoader();
 loader.smoothNormals = true;
 loader.setPartsLibraryPath(LIBRARY_PATH);
@@ -93,7 +101,12 @@ loader.setConditionalLineMaterial(LDrawConditionalLineMaterial);
 // NB: we must use loader.parse() below rather than loader.load(): load() calls
 // setMaterials([]) internally, which would discard these preloaded colours and
 // render every brick in the magenta "unknown colour" fallback. parse() keeps them.
-await loader.preloadMaterials(`${LIBRARY_PATH}LDConfig.ldr`);
+try {
+  await loader.preloadMaterials(`${LIBRARY_PATH}LDConfig.ldr`);
+} catch (err) {
+  failLoad(err, `Couldn't load LEGO colour definitions from ${LIBRARY_PATH}LDConfig.ldr — the parts library may be missing or incomplete.`);
+  throw err;   // stop: parsing without colours renders everything magenta
+}
 
 statusEl.textContent = 'Loading model…';
 progressEl.style.width = '30%';
@@ -107,14 +120,10 @@ try {
   loader.parse(
     text,
     (group) => onModelLoaded(group, text),
-    (err) => {
-      console.error(err);
-      statusEl.textContent = 'Failed to load model — see console.';
-    }
+    (err) => failLoad(err, `The model file couldn't be parsed.`)
   );
 } catch (err) {
-  console.error(err);
-  statusEl.textContent = 'Failed to load model — see console.';
+  failLoad(err, `Couldn't load the model from ${MODEL_URL}.`);
 }
 
 function onModelLoaded(group, modelText) {
