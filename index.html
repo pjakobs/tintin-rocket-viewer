@@ -90,6 +90,16 @@
         border: 1px solid rgba(207,233,251,0.4); border-radius: 4px;
         padding: 0 4px; font-size: 10px; line-height: 15px; color: #9fc7de;
       }
+
+      #notice {
+        position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 10;
+        max-width: 360px; text-align: center;
+        background: rgba(20, 22, 28, 0.85); color: #e8eaf0;
+        padding: 10px 16px; border-radius: 10px; backdrop-filter: blur(6px);
+        border: 1px solid rgba(248,113,113,0.35); font-size: 12px; line-height: 1.4;
+        transition: opacity 0.3s;
+      }
+      #notice.hidden { opacity: 0; pointer-events: none; }
     </style>
   </head>
   <body>
@@ -132,6 +142,7 @@
       <button id="share" title="Copy a link to this exact view">🔗 Copy link</button>
       <button id="show-all" class="gone" title="Un-hide every hidden brick (U undoes one)">↺ Show all (0)</button>
     </div>
+    <div id="notice" class="hidden"></div>
     <div id="loading">
       <div>
         <div id="load-msg">Loading LEGO model…</div>

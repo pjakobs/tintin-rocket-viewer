@@ -13,6 +13,20 @@ const EXPLODE_BASE = 45;     // + a constant push (LDU) so axis-hugging bricks a
 const VERTICAL_BIAS = 0.4;   // how much bricks also fan out along the rocket axis
 const PLAY_SECONDS = 22;     // duration of the "Play build" animation
 
+// Order-sensitive fingerprint over the brick list (FNV-1a with a separator
+// byte, so a reorder, insert or delete changes it). Used to detect share
+// links made against a different build of the model — see state.js.
+function fingerprintOf(entries) {
+  let h = 0x811c9dc5;
+  const mix = (c) => { h ^= c; h = Math.imul(h, 0x01000193); };
+  for (const e of entries) {
+    const s = e.group.userData.fileName || '';
+    for (let i = 0; i < s.length; i++) mix(s.charCodeAt(i));
+    mix(0x2c);   // separator: ["ab","c"] must not hash like ["a","bc"]
+  }
+  return (h >>> 0).toString(36);
+}
+
 function collectBricks(root) {
   const isDat = (o) => o.isGroup && /\.dat$/i.test(o.userData?.fileName || '');
   const bricks = [];
@@ -75,6 +89,7 @@ export function initFeatures(model) {
 
   model.bricks = entries;
   model.maxStep = maxStep;
+  model.fingerprint = fingerprintOf(entries);
 
   function setExplode(amount) {
     // e.dir already encodes the displacement at 100%; just scale by the slider.

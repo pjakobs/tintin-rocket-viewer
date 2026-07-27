@@ -36,6 +36,17 @@ function parseHash() {
 
 function round(n) { return Math.round(n * 10) / 10; }
 
+const NOTICE_MS = 8000;   // how long the dismissible notice stays up
+
+function notice(msg) {
+  const el = document.getElementById('notice');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.remove('hidden');
+  clearTimeout(notice.timer);
+  notice.timer = setTimeout(() => el.classList.add('hidden'), NOTICE_MS);
+}
+
 export function initStateSync({ model, camera, controls }) {
   const explodeEl = document.getElementById('explode');
   const stepEl = document.getElementById('step');
@@ -50,6 +61,7 @@ export function initStateSync({ model, camera, controls }) {
     if (stepEl.valueAsNumber < model.maxStep) s.s = stepEl.valueAsNumber;
     if (model.selectedIndex != null) s.p = model.selectedIndex;
     if (model.hiddenIndices.length) s.h = model.hiddenIndices.join(',');
+    if (s.p != null || s.h != null) s.v = model.fingerprint;
     if (cameraTouched) {
       s.cx = round(camera.position.x); s.cy = round(camera.position.y); s.cz = round(camera.position.z);
       s.tx = round(controls.target.x); s.ty = round(controls.target.y); s.tz = round(controls.target.z);
@@ -79,6 +91,15 @@ export function initStateSync({ model, camera, controls }) {
     controls.target.set(+initial.tx, +initial.ty, +initial.tz);
     controls.update();
     cameraTouched = true;
+  }
+  // p=/h= are positional indices into model.bricks — meaningless if the brick
+  // list has changed shape since the link was made (reorder/insert/delete), and
+  // silently resolving to the wrong brick is worse than not resolving at all.
+  // A missing v counts as a mismatch (old links predate the fingerprint).
+  const brickRefs = initial.p != null || initial.h != null;
+  if (brickRefs && initial.v !== model.fingerprint) {
+    delete initial.p; delete initial.h;
+    notice('This link was made from a different version of the model — the highlighted and hidden bricks could not be restored.');
   }
   // Hidden bricks before the selection: a brick that's both hidden and selected is
   // contradictory (you'd get an info panel for something invisible), so hidden wins.
