@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Tintin Rocket Viewer — Software Design Document</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #0b0d12;
+    --panel: #14161c;
+    --panel-2: #191c24;
+    --border: rgba(255,255,255,0.10);
+    --text: #e8eaf0;
+    --muted: #9aa0ac;
+    --accent: #7dd3fc;
+    --accent-2: #37c0ff;
+    --code-bg: #0f1115;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f5f6f8;
+      --panel: #ffffff;
+      --panel-2: #f0f1f4;
+      --border: rgba(0,0,0,0.10);
+      --text: #1a1d24;
+      --muted: #5b6270;
+      --accent: #0284c7;
+      --accent-2: #0369a1;
+      --code-bg: #eef0f3;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0b0d12; --panel: #14161c; --panel-2: #191c24; --border: rgba(255,255,255,0.10);
+    --text: #e8eaf0; --muted: #9aa0ac; --accent: #7dd3fc; --accent-2: #37c0ff; --code-bg: #0f1115;
+  }
+  :root[data-theme="light"] {
+    --bg: #f5f6f8; --panel: #ffffff; --panel-2: #f0f1f4; --border: rgba(0,0,0,0.10);
+    --text: #1a1d24; --muted: #5b6270; --accent: #0284c7; --accent-2: #0369a1; --code-bg: #eef0f3;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 48px 24px 96px;
+  }
+  h1 { font-size: 28px; margin: 0 0 6px; letter-spacing: -0.01em; }
+  h2 {
+    font-size: 20px; margin: 48px 0 12px; padding-top: 16px;
+    border-top: 1px solid var(--border);
+    letter-spacing: -0.01em;
+  }
+  h3 { font-size: 15px; margin: 28px 0 8px; color: var(--accent); }
+  h4 { font-size: 13px; margin: 16px 0 6px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  p { margin: 0 0 12px; color: var(--text); }
+  .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 32px; }
+  .subtitle code { font-size: 13px; }
+
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    background: var(--code-bg);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    border: 1px solid var(--border);
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-size: 12.5px;
+    line-height: 1.55;
+  }
+  pre code { background: none; border: none; padding: 0; }
+
+  a { color: var(--accent); }
+
+  table { border-collapse: collapse; width: 100%; margin: 12px 0 20px; font-size: 13.5px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; }
+  td code { white-space: nowrap; }
+
+  ul, ol { margin: 0 0 14px; padding-left: 22px; }
+  li { margin-bottom: 5px; }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin: 14px 0;
+  }
+  .card h3 { margin-top: 0; }
+  .card .file { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+
+  .callout {
+    border-left: 3px solid var(--accent-2);
+    background: var(--panel-2);
+    border-radius: 0 8px 8px 0;
+    padding: 10px 14px;
+    margin: 14px 0;
+    font-size: 13.5px;
+  }
+  .callout strong { color: var(--accent); }
+
+  .diagram {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin: 16px 0;
+    overflow-x: auto;
+  }
+  .diagram pre { border: none; background: none; padding: 0; margin: 0; font-size: 12.5px; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+    margin: 16px 0;
+  }
+  .grid .box {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 13px;
+  }
+  .grid .box .name { font-family: ui-monospace, monospace; color: var(--accent); font-size: 13px; margin-bottom: 4px; }
+  .grid .box .desc { color: var(--muted); font-size: 12.5px; }
+
+  .toc {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin: 24px 0 40px;
+  }
+  .toc h4 { margin-top: 0; }
+  .toc ol { columns: 2; column-gap: 24px; }
+  .toc a { color: var(--text); text-decoration: none; font-size: 13.5px; }
+  .toc a:hover { color: var(--accent); text-decoration: underline; }
+
+  .stat-row { display: flex; gap: 24px; flex-wrap: wrap; margin: 16px 0; }
+  .stat { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 10px 16px; }
+  .stat .n { font-size: 20px; font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+
+  footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<h1>Tintin Rocket Viewer — Software Design Document</h1>
+<p class="subtitle">A Three.js digital twin of the LEGO 21367 Tintin Moon Rocket, rendered directly from an LDraw model. Covers architecture, module responsibilities, data flow, and build tooling as of the current <code>main</code> branch.</p>
+
+<div class="stat-row">
+  <div class="stat"><div class="n">6</div><div class="l">src modules</div></div>
+  <div class="stat"><div class="n">~1,080</div><div class="l">lines of JS</div></div>
+  <div class="stat"><div class="n">1,181</div><div class="l">bricks rendered</div></div>
+  <div class="stat"><div class="n">1</div><div class="l">runtime dependency (three)</div></div>
+</div>
+
+<div class="toc">
+  <h4>Contents</h4>
+  <ol>
+    <li><a href="#overview">1. Overview</a></li>
+    <li><a href="#stack">2. Technology stack</a></li>
+    <li><a href="#architecture">3. Runtime architecture</a></li>
+    <li><a href="#modules">4. Module reference</a></li>
+    <li><a href="#lifecycle">5. Load lifecycle</a></li>
+    <li><a href="#data-model">6. The brick data model</a></li>
+    <li><a href="#state">7. URL state / deep linking</a></li>
+    <li><a href="#build-pipeline">8. Offline build pipeline (scripts/)</a></li>
+    <li><a href="#assets">9. Asset layout</a></li>
+    <li><a href="#gotchas">10. Notable design decisions & gotchas</a></li>
+    <li><a href="#deploy">11. Build & deployment</a></li>
+    <li><a href="#extending">12. Extension points</a></li>
+  </ol>
+</div>
+
+<h2 id="overview">1. Overview</h2>
+<p>
+  The app is a single-page, client-only 3D viewer. It loads an LDraw <code>.ldr</code> model
+  (a plain-text brick-by-brick assembly description) with Three.js's built-in
+  <code>LDrawLoader</code>, keeps every LEGO part as its own addressable <code>Object3D</code>,
+  and layers interactive features — explode, build-step scrubbing, click-to-inspect,
+  per-brick hide, and shareable deep links — directly on top of that per-part hierarchy.
+</p>
+<p>
+  There is no backend, no build-time model processing beyond static asset copying, and
+  no framework: six small ES modules coordinate through a single shared <code>model</code> object
+  and the DOM.
+</p>
+
+<h2 id="stack">2. Technology stack</h2>
+<table>
+  <tr><th>Concern</th><th>Choice</th><th>Notes</th></tr>
+  <tr><td>Rendering</td><td>Three.js <code>r0.171</code></td><td>Only runtime dependency (<code>package.json</code>)</td></tr>
+  <tr><td>Model loading</td><td><code>LDrawLoader</code> (three/addons)</td><td>Chosen over a Blender→glTF bake — see §10</td></tr>
+  <tr><td>Camera controls</td><td><code>OrbitControls</code> (three/addons)</td><td>Damped orbit/zoom/pan</td></tr>
+  <tr><td>Bundler / dev server</td><td>Vite 6</td><td><code>appType: 'mpa'</code> so missing parts 404 instead of falling back to <code>index.html</code></td></tr>
+  <tr><td>UI</td><td>Plain HTML/CSS in <code>index.html</code>, wired up imperatively</td><td>No component framework</td></tr>
+  <tr><td>Language</td><td>Vanilla ES modules, no TypeScript</td><td>Build target <code>es2022</code> (top-level <code>await</code>)</td></tr>
+  <tr><td>Hosting</td><td>Vercel, prebuilt static output</td><td><code>vercel build --prod && vercel deploy --prebuilt --prod</code></td></tr>
+</table>
+
+<h2 id="architecture">3. Runtime architecture</h2>
+<div class="diagram">
+<pre>
+index.html
+   │  loads
+   ▼
+src/main.js  ── scene / camera / renderer / lighting / LDrawLoader / frameModel()
+   │
+   ├── fetch(model .ldr) → loader.parse() → onModelLoaded(group)
+   │        counts placed meshes, adds group to the scene
+   │
+   ├──▶ src/geometry.js   axisOfSymmetry()      (pure helper, no state)
+   │
+   ├──▶ src/features.js   const features = initFeatures(model)
+   │        collects "brick groups" → model.bricks[] (data stays on model)
+   │        returns { view, bricks, maxStep, fingerprint, setView, setHidden,
+   │                  unhideLast, showAllHidden, hiddenIndices, onChange, dispose }
+   │        wires: #explode / #step sliders, ▶ Play build, ↺ Show all
+   │
+   ├──▶ src/hotspots.js   const hotspots = initHotspots({ camera, renderer, features, libraryPath })
+   │        raycast → brick lookup (via features.bricks) → highlight + #inspect panel
+   │        returns { selectedIndex, selectBrick, deselect, onChange, dispose }
+   │
+   ├──▶ src/state.js      const state = initStateSync({ camera, controls, features, hotspots })
+   │        returns { scheduleWrite, restore, dispose } — construction only wires
+   │        the camera 'change' listener and the share button; restore() is called
+   │        explicitly, after onChange is wired, so it's a one-line ordering fact
+   │        instead of tribal knowledge
+   │
+   │  features.onChange = state.scheduleWrite;   // one notification path per module —
+   │  hotspots.onChange = state.scheduleWrite;   // no DOM-as-state-store, no dispatchEvent
+   │  state.restore();
+   │
+   └──▶ src/crosscheck.js crossCheck(modelText)   (async, non-blocking)
+            reconciles LDR part counts against public/model/rebrickable_parts.csv
+            → HUD stat rows
+
+window.viewer = { THREE, scene, camera, renderer, controls, model }   (console/debug escape hatch —
+                                                                        model is data only; see §12)
+</pre>
+</div>
+<p>
+  Coordination is deliberately flat, but no longer mutates a shared object to get there: <code>main.js</code>
+  constructs the scene and the plain-data <code>model</code>, then calls <code>initFeatures(model)</code>,
+  <code>initHotspots({ …, features })</code>, and <code>initStateSync({ …, features, hotspots })</code> in
+  turn, each returning an API object rather than attaching methods onto its input. The call signatures
+  themselves make the dependency order explicit — <code>hotspots</code> needs <code>features</code>,
+  <code>state</code> needs both — instead of an unenforced convention that only breaks when a deep-linked
+  URL happens to exercise a restore path. Cross-module notification is a single <code>onChange</code> slot
+  per returned object (<code>features.onChange</code>, <code>hotspots.onChange</code>), both wired by
+  <code>main.js</code> to <code>state.scheduleWrite</code> — one path per module, not two independent
+  ones for what is logically the same change.
+</p>
+
+<h2 id="modules">4. Module reference</h2>
+
+<div class="card">
+  <h3>src/main.js <span style="color:var(--muted); font-weight:400; font-size:12px;">— 280 lines</span></h3>
+  <p>Entry point. Owns the Three.js scene, renderer, camera, lighting, and the <code>LDrawLoader</code>
+  setup. Fetches and parses the model, counts placed meshes, frames the camera on load, and runs the
+  render loop. Also implements <strong>Recentre</strong> (undoing pan drift in the orbit target) and
+  the missing-parts tally (a <code>LoadingManager.onError</code>/<code>onProgress</code> hook, replacing
+  an earlier <code>console.warn</code>-text-matching interceptor). Constructs
+  <code>features</code> / <code>hotspots</code> / <code>state</code> and wires their <code>onChange</code>
+  slots together; <code>model</code> itself is just <code>{ root, bricks, maxStep, fingerprint }</code>.</p>
+  <table>
+    <tr><td><code>onModelLoaded(group, text)</code></td><td>post-load fixups (edge materials, upright rotation), then constructs and wires the three feature modules</td></tr>
+    <tr><td><code>frameModel(object)</code></td><td>centres the model on its axis of symmetry and fits the camera to its bounding sphere, leaving headroom for a 300% explode</td></tr>
+    <tr><td><code>recentre()</code></td><td>moves camera + orbit target back by the same delta to undo a pan, without touching zoom/angle</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h3>src/features.js <span style="color:var(--muted); font-weight:400; font-size:12px;">— 256 lines</span></h3>
+  <p>Everything driven by the <em>Explode</em> and <em>Build step</em> sliders, plus per-brick
+  hide/restore. Collects the ~1,181 "brick groups" (outermost <code>Object3D</code>s whose
+  <code>userData.fileName</code> is a <code>.dat</code> part), stamps each with its own
+  <code>index</code>, and pre-computes a local-frame displacement vector per brick so the
+  exploded-view update is a single <code>copy + addScaledVector</code> per frame.
+  <code>initFeatures(model)</code> returns an API object rather than mutating <code>model</code>
+  with methods; <code>view = { explode, step }</code> is the one source of truth sliders read
+  from and write to via <code>setView(patch)</code> — no more synthetic
+  <code>dispatchEvent</code> to reconcile Play-build's programmatic slider updates with the
+  drag-driven ones.</p>
+  <table>
+    <tr><td><code>setView({ explode, step })</code></td><td>merges into <code>view</code>, re-renders sliders/labels/3D, and calls <code>onChange</code> — explode is 0–3, scaling every brick's precomputed displacement</td></tr>
+    <tr><td><code>applyVisibility()</code></td><td>the single writer of <code>group.visible</code> — ANDs the step test with the hidden flag</td></tr>
+    <tr><td><code>setHidden</code> / <code>unhideLast</code> / <code>showAllHidden</code></td><td>per-brick hide, backed by a most-recent-last stack for <code>U</code> / <code>Cmd+Z</code></td></tr>
+    <tr><td>Play build</td><td><code>requestAnimationFrame</code> loop calling <code>setView({ step })</code> over ~22s</td></tr>
+    <tr><td><code>dispose()</code></td><td>removes the DOM/window listeners this module added; not wired to anything yet</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h3>src/hotspots.js <span style="color:var(--muted); font-weight:400; font-size:12px;">— 234 lines</span></h3>
+  <p>Click-to-inspect. Raycasts against a flat list of brick meshes, resolves a hit back to its
+  brick group via a <code>mesh → brick</code> map built from <code>features.bricks</code>, and shows
+  an emissive-material highlight plus an oriented <code>Box3Helper</code> computed in the brick's own
+  local frame (so it hugs rotated parts and follows them through an explode). Distinguishes a
+  click from an orbit-drag by pointer-travel distance. Lazily fetches each part's human-readable
+  description from its <code>.dat</code> file's header comment. Takes <code>{ camera, renderer,
+  features, libraryPath }</code> — no more unused <code>THREE</code> / <code>scene</code> params, and
+  no <code>controls</code> passed in at all (it never used it).</p>
+  <table>
+    <tr><td><code>selectBrick(brick)</code> / <code>deselect()</code></td><td>public entry points, also used by <code>state.js</code> to restore a deep-linked selection; own <code>selectedIndex</code> and call <code>onChange</code> directly via <code>brick.index</code>, no <code>indexOf</code> scan</td></tr>
+    <tr><td><code>pick(x, y)</code></td><td>raycast helper; skips bricks hidden by the step scrubber</td></tr>
+    <tr><td><code>hideSelected()</code></td><td>deselects first (restoring materials) then calls <code>features.setHidden</code></td></tr>
+    <tr><td><code>dispose()</code></td><td>removes pointer/keydown listeners and clears the current highlight</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h3>src/state.js <span style="color:var(--muted); font-weight:400; font-size:12px;">— 154 lines</span></h3>
+  <p>Deep-links explode amount, build step, selected/hidden bricks, and camera position+target
+  into <code>location.hash</code> as a short key=value string, reading <code>features.view</code>,
+  <code>features.hiddenIndices</code>, and <code>hotspots.selectedIndex</code> directly rather than
+  DOM element values. Only keys that differ from the default view are written. Writes are
+  debounced with a max-wait (350ms / 600ms) because <code>OrbitControls</code> damping keeps firing
+  <code>change</code> events long after a drag ends. Construction only wires the camera listener and
+  the share button; <code>restore()</code> is a separate call the caller makes explicitly once
+  <code>features.onChange</code> / <code>hotspots.onChange</code> are wired, replaying the hash in a
+  fixed order — hidden bricks before selection, so a brick that's both hidden and selected stays
+  hidden. The <code>restoring</code> flag suppresses <code>scheduleWrite</code> during that replay.</p>
+</div>
+
+<div class="card">
+  <h3>src/geometry.js <span style="color:var(--muted); font-weight:400; font-size:12px;">— 30 lines</span></h3>
+  <p>One pure helper, <code>axisOfSymmetry()</code>, shared by <code>main.js</code> (camera framing) and
+  <code>features.js</code> (explode direction) to avoid an import cycle. Computes the model's true
+  vertical axis as the mean of every brick's own centre, rather than the bounding-box centre —
+  the splayed landing legs pull a bbox centre ~53 LDU off-axis.</p>
+</div>
+
+<div class="card">
+  <h3>src/crosscheck.js <span style="color:var(--muted); font-weight:400; font-size:12px;">— 106 lines</span></h3>
+  <p>Runtime sanity check, independent of rendering: expands the raw LDraw MPD text to per-part
+  leaf counts and reconciles them against the manual-derived <code>rebrickable_parts.csv</code>.
+  Runs off the same model text the viewer just loaded, so what's counted matches what's
+  rendered. Results populate the HUD's "Manual CSV" row and a detailed breakdown in the
+  console (<code>console.groupCollapsed</code>).</p>
+</div>
+
+<h2 id="lifecycle">5. Load lifecycle</h2>
+<ol>
+  <li><code>index.html</code> loads <code>src/main.js</code> as a module.</li>
+  <li>Scene, renderer, camera, lights, and <code>OrbitControls</code> are constructed synchronously.</li>
+  <li><code>loader.preloadMaterials(LDConfig.ldr)</code> — awaited so real LEGO colours are known before parsing.</li>
+  <li><code>fetch()</code> the <code>.ldr</code> model text, then <code>loader.parse(text, …)</code> (not <code>loader.load()</code> — see §10).</li>
+  <li><code>onModelLoaded()</code> rotates the model upright, patches null edge-line materials, counts meshes, adds the group to the scene, then calls <code>frameModel()</code> and <code>updateHUD()</code>.</li>
+  <li><code>const features = initFeatures(model)</code> → <code>const hotspots = initHotspots({ …, features })</code> → <code>const state = initStateSync({ …, features, hotspots })</code>, in that order — each call signature requires the previous object, so the ordering is enforced by what the functions accept rather than by convention.</li>
+  <li><code>features.onChange = state.scheduleWrite; hotspots.onChange = state.scheduleWrite;</code> then <code>state.restore()</code> — wiring happens before restoring, so a restored selection or hidden brick would notify <code>scheduleWrite</code> like any other change; the <code>restoring</code> flag inside <code>state.js</code> is what actually suppresses the write during replay.</li>
+  <li><code>crossCheck(modelText)</code> runs asynchronously and patches the HUD when it resolves.</li>
+  <li><code>animate()</code> starts the render loop (already running from module load; rendering an empty scene until step 5 populates it).</li>
+</ol>
+
+<h2 id="data-model">6. The brick data model</h2>
+<p>
+  The central data structure is <code>model.bricks</code>, an array built once in
+  <code>initFeatures()</code> and also returned as <code>features.bricks</code> (same array,
+  same objects — <code>model</code> is the data bag, <code>features</code> is the behaviour that
+  reads and writes it):
+</p>
+<pre><code>model.bricks = [
+  {
+    group,   // THREE.Group — the brick's own Object3D (userData.fileName, .buildingStep, .colorCode)
+    step,    // LDraw build step this brick appears at
+    home,    // group.position at load time (assembled position)
+    dir,     // precomputed local-frame displacement vector at 100% explode
+    hidden,  // per-brick hide flag
+    index,   // this entry's own position in the array
+  },
+  ...
+]</code></pre>
+<p>
+  This is the shared vocabulary every feature module operates on: <code>features.js</code> writes
+  <code>group.position</code> / <code>group.visible</code> from it, <code>hotspots.js</code> builds a
+  <code>mesh → brick</code> lookup from it for raycasting and reads <code>brick.index</code> to set
+  <code>selectedIndex</code>, and <code>state.js</code> references entries by that same
+  <code>index</code> for URL links (<code>p=</code> for selection, <code>h=</code> for hidden). Both
+  reads used to be an <code>entries.indexOf(brick)</code> scan over ~1,181 entries per lookup; the
+  stamped <code>index</code> makes it O(1).
+</p>
+<p>
+  Positional indices are why a model-file change (like splitting out the minifig gear) can silently
+  resolve a link to the <em>wrong</em> brick — this already happened once. <code>model.fingerprint</code>
+  (also set by <code>initFeatures()</code>, an order-sensitive hash over the brick list) guards
+  against it: see §7.
+</p>
+
+<h2 id="state">7. URL state / deep linking</h2>
+<p>Format: a short <code>&amp;</code>-joined <code>key=value</code> hash string.</p>
+<pre><code>#e=35&amp;s=200&amp;p=300&amp;h=41,88&amp;v=1ysb0ap&amp;cx=527&amp;cy=154&amp;cz=2604&amp;tx=0&amp;ty=0&amp;tz=0</code></pre>
+<table>
+  <tr><th>Key</th><th>Meaning</th></tr>
+  <tr><td><code>e</code></td><td>explode amount (0–300)</td></tr>
+  <tr><td><code>s</code></td><td>build step</td></tr>
+  <tr><td><code>p</code></td><td>selected brick — index into <code>model.bricks</code></td></tr>
+  <tr><td><code>h</code></td><td>comma-separated hidden brick indices</td></tr>
+  <tr><td><code>v</code></td><td><code>model.fingerprint</code> at write time — only present when <code>p=</code> or <code>h=</code> is; see below</td></tr>
+  <tr><td><code>cx/cy/cz</code>, <code>tx/ty/tz</code></td><td>camera position and orbit target</td></tr>
+</table>
+<p>Only keys that differ from the default view are written, so a plain visit keeps a clean URL. The <em>Copy link</em> button flushes the debounced write immediately before copying.</p>
+<p>
+  <code>p=</code>/<code>h=</code> are positional indices into <code>model.bricks</code> (§6) — meaningless
+  if the brick list has changed shape since the link was made. Rather than resolving an in-range index
+  to a different brick, restore gates both keys on an exact <code>v=</code> match against the current
+  <code>model.fingerprint</code>; a missing <code>v=</code> counts as a mismatch (it predates this check).
+  On mismatch, <code>p=</code>/<code>h=</code> are dropped and a dismissible notice explains why —
+  camera, explode and step still restore, so a stale link degrades rather than failing wholesale.
+</p>
+
+<h2 id="build-pipeline">8. Offline build pipeline (scripts/)</h2>
+<p>These are one-off/occasional Node scripts, not part of the app's runtime — they regenerate committed assets under <code>public/</code>.</p>
+
+<div class="grid">
+  <div class="box">
+    <div class="name">strip-loose-elements.mjs</div>
+    <div class="desc">Splits the untouched master Studio export into the rocket-only model the viewer renders (<code>public/model/tintin-rocket.ldr</code>) and the 74 loose minifig-gear bricks (<code>references/minifig-gear.ldr</code>), which sit ~500 LDU off to the side and would otherwise inflate the model bounds and skew the explode centroid.</div>
+  </div>
+  <div class="box">
+    <div class="name">extract-custom-parts.mjs</div>
+    <div class="desc">Pulls the two BrickLink Studio-proprietary parts (<code>bl_8097</code> nose cone, <code>bl_98138pb459</code> printed tile) out of the Studio <code>.io</code> export's embedded geometry, normalising prefix/version differences across Studio releases, and writes them as real <code>.dat</code> files into the library.</div>
+  </div>
+  <div class="box">
+    <div class="name">prune-library.mjs</div>
+    <div class="desc">Walks the ~820MB full LDraw library from a root-level <code>ldraw-library/</code> (kept out of <code>public/</code>) and copies only the ~529 parts/primitives this model + the split-out minifig gear reference into <code>public/ldraw-min/</code> (~2.7MB), which <em>is</em> committed and served.</div>
+  </div>
+</div>
+
+<p>Regeneration order, per the README:</p>
+<pre><code>node scripts/extract-custom-parts.mjs     # 1. add Studio custom parts to ldraw-library/
+node scripts/prune-library.mjs --apply    # 2. slim to public/ldraw-min/</code></pre>
+
+<h2 id="assets">9. Asset layout</h2>
+<pre><code>public/
+  model/
+    tintin-rocket.ldr          # the model — MPD, 36 submodels, 1,181 bricks
+    rebrickable_parts.csv      # manual-derived parts list, for crosscheck.js
+  ldraw-min/                   # slim LDraw library (parts/, p/, LDConfig.ldr) — ~2.7 MB, committed
+src/                           # the 6 modules described above
+scripts/                       # offline generators, described above
+references/                    # untouched original source files
+  minifig-gear.ldr             # the 74 split-out bricks, a standalone MPD
+docs/
+  screenshot.png
+  architecture.html            # this document
+ldraw-library/                 # gitignored — full official library, prune-library.mjs's source only</code></pre>
+
+<h2 id="gotchas">10. Notable design decisions & gotchas</h2>
+
+<h3>LDrawLoader over a Blender → glTF bake</h3>
+<p>
+  A Blender import/export would bake everything into a handful of material-batched meshes —
+  faster to render, but it destroys per-part identity. <code>LDrawLoader</code> keeps every brick as
+  its own <code>Object3D</code> carrying its LDraw part number and build step in <code>userData</code>,
+  which every interactive feature (hotspots, explode, build scrubbing) depends on. Verified
+  coverage: 129/133 unique parts from the official library, 131/133 with the unofficial add-on,
+  and the remaining 2 Studio-proprietary parts extracted from the <code>.io</code> export — 0 missing
+  at runtime. Performance: 1,181 bricks → 1,228 meshes, ~674k triangles, ~3,630 draw calls,
+  60fps on a normal desktop GPU with no merging.
+</p>
+
+<div class="callout"><strong>Four r0.171 gotchas fixed in main.js:</strong>
+  <ol style="margin: 8px 0 0;">
+    <li><code>loader.setConditionalLineMaterial(...)</code> is mandatory or parsing throws.</li>
+    <li><code>loader.load()</code> calls <code>setMaterials([])</code> internally and discards preloaded colours (renders everything magenta). Use <code>preloadMaterials()</code> + <code>fetch()</code> + <code>loader.parse()</code> instead.</li>
+    <li>Edge <code>LineSegments</code> can come back with a <code>null</code> material and crash the renderer at <code>material.visible</code> — patched with a shared <code>LineBasicMaterial</code> post-load.</li>
+    <li>Vite's SPA fallback serves <code>index.html</code> for a missing <code>.dat</code>, which the loader then tries to parse. Fixed with <code>appType: 'mpa'</code> so missing parts are real 404s.</li>
+  </ol>
+</div>
+
+<h3>Axis of symmetry, not bounding-box centre</h3>
+<p>
+  The three landing legs splay asymmetrically; a bounding-box centre is dragged ~53 LDU off the
+  rocket's real vertical axis by the leg tips. <code>geometry.js</code>'s <code>axisOfSymmetry()</code>
+  instead averages every brick's own centre — dominated by the symmetric body, landing within
+  ~1.3 LDU of the true axis. Used both for camera framing (avoids visible orbit swing) and for
+  explode direction (avoids fanning one side of a ring further than the other).
+</p>
+
+<h3>Visibility has exactly one writer</h3>
+<p>
+  Two independent things can suppress a brick — the build-step scrubber and per-brick hide.
+  <code>features.js</code>'s <code>applyVisibility()</code> is the only code path that assigns
+  <code>group.visible</code>, computing it as <code>step &lt;= currentStep &amp;&amp; !hidden</code>. Setting
+  <code>visible</code> anywhere else would work until the next scrubber tick or Play-build frame
+  silently resurrects the brick.
+</p>
+
+<h3>Recentre vs. the axis fix — two different bugs</h3>
+<p>
+  The axis-of-symmetry fix corrects a <em>fresh-load</em> framing bug. Right-drag panning in
+  <code>OrbitControls</code> slides the camera and orbit target together, so after a pan the
+  camera pivots about wherever the target landed — off-axis, and persisted into the URL hash, so
+  it survives a reload. <code>recentre()</code> in <code>main.js</code> is the separate fix for that:
+  it moves both camera and target back by the same delta, leaving zoom and orbit angle untouched.
+</p>
+
+<h3>BrickLink/LDraw part-number collisions</h3>
+<p>
+  BrickLink's part numbering can collide with unrelated LDraw part numbers for the same digits
+  (BrickLink <code>8097</code> is a different cone shape from LDraw's <code>8097.dat</code>, with a
+  different local origin). Aliasing the Studio custom part to the LDraw file of the same number
+  renders the nose cones splayed outward like ears. <code>extract-custom-parts.mjs</code> instead
+  pulls Studio's own embedded geometry so the model's transforms place it correctly.
+</p>
+
+<h2 id="deploy">11. Build & deployment</h2>
+<table>
+  <tr><td><code>npm run dev</code></td><td>Vite dev server</td></tr>
+  <tr><td><code>npm run build</code></td><td>static production build to <code>dist/</code></td></tr>
+  <tr><td><code>npm test</code></td><td><code>vitest run</code> — pins <code>crosscheck.js</code>, <code>state.js</code>, and <code>geometry.js</code>'s pure helpers (§4)</td></tr>
+  <tr><td><code>npm run deploy</code></td><td><code>vercel build --prod &amp;&amp; vercel deploy --prebuilt --prod</code></td></tr>
+</table>
+<p>
+  Deploys from prebuilt output rather than letting Vercel build from source, because a plain
+  <code>vercel --prod</code> tries to upload the whole working directory and hits Vercel's
+  15,000-file cap (mostly <code>node_modules</code>). The GitHub repo is private and not
+  auto-deploy-connected, so <code>npm run deploy</code> is the sole publish path.
+</p>
+
+<h2 id="extending">12. Extension points</h2>
+<p>
+  <code>window.viewer</code> exposes <code>{ THREE, scene, camera, renderer, controls, model }</code>
+  for console-driven exploration. As of the §3 composition refactor, <code>model</code> is data only
+  (<code>root</code>, <code>bricks</code>, <code>maxStep</code>, <code>fingerprint</code>) — it no
+  longer carries <code>setExplode</code> / <code>setStep</code> / <code>setHidden</code> /
+  <code>unhideLast</code> / <code>showAllHidden</code> / <code>selectBrick</code> / <code>deselect</code>
+  as callable methods. That behaviour lives on the <code>features</code> / <code>hotspots</code> / <code>state</code>
+  objects <code>main.js</code>'s <code>onModelLoaded()</code> builds locally (§3) — not reachable from
+  <code>window.viewer</code> without adding a debug export there, a deliberate tradeoff (see the
+  remediation plan's D2) against keeping the god-object pattern the refactor removes just to preserve
+  a console one-liner.
+</p>
+<ul>
+  <li><strong>Isolate / colour-by:</strong> <code>model.bricks</code> gives every brick its step and metadata already — tint by <code>step</code> for a build-order heatmap, or filter by <code>group.userData.fileName</code> / <code>colorCode</code> to isolate a part type or colour.</li>
+  <li><strong>Inventory linking:</strong> join a selected part number against <code>crosscheck.js</code>'s parsed CSV data to show set-level quantities/spares next to the in-build count.</li>
+</ul>
+
+<footer>Generated from the <code>main</code> branch source (src/, scripts/, index.html, vite.config.js, README.md). Regenerate by re-reading those files if the architecture changes materially.</footer>
+
+</body>
+</html>

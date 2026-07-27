@@ -227,9 +227,11 @@ The bottom control bar drives two features off the per-part LDraw metadata:
 
 Both work on **brick groups** — the outermost `Object3D` whose
 `userData.fileName` is a `.dat` part (nested sub-parts move/hide with their
-brick). `initFeatures()` collects exactly 1,181 of them and stores
-`model.bricks = [{ group, step, home, dir, hidden }]`, plus `model.setExplode(0..3)`
-and `model.setStep(n)` for the console.
+brick). `initFeatures(model)` collects exactly 1,181 of them, stores them as
+`model.bricks = [{ group, step, home, dir, hidden, index }]`, and returns an API
+object (`features`) that owns the behaviour: `features.view = { explode, step }`
+is the single source of truth for the sliders, updated via
+`features.setView({ explode, step })` — see [Extending it further](#extending-it-further).
 
 - **Hide individual bricks** — select a brick and press `H` (or click *Hide brick*
   in the inspect panel) to take it out of the scene, so you can peel off a panel and
@@ -276,9 +278,13 @@ and `model.setStep(n)` for the console.
   `h=` is applied before `p=`, so a brick that's both hidden and selected stays
   hidden rather than showing an info panel for something invisible.
 
-  > `p=` and `h=` are **positional indices** into `model.bricks`, so links break if
-  > the model file changes (as it did when the minifig gear was split out). Out-of-range
-  > indices are ignored rather than throwing.
+  > `p=` and `h=` are **positional indices** into `model.bricks`, so they'd silently
+  > resolve to the *wrong* brick if the model file changed shape (as it did when the
+  > minifig gear was split out) — the exact failure that happened once already. A `v=`
+  > fingerprint over the brick list (order-sensitive FNV-1a) guards against this: on
+  > restore, a missing or mismatched `v=` drops `p=`/`h=` and shows a dismissible
+  > notice instead of resolving to the wrong brick. Camera, explode and step still
+  > restore from a stale link — only the brick references degrade.
 
 ## Deploying
 
@@ -296,8 +302,31 @@ browser (Vercel dashboard → Project → Settings → Git → Connect). Until t
 
 ## Extending it further
 
-`window.viewer` exposes `{ THREE, scene, camera, renderer, controls, model }`, and
-`model` now also carries `selectBrick(brick)` / `deselect()`.
+`window.viewer` exposes `{ THREE, scene, camera, renderer, controls, model }` for
+console-driven exploration. `model` is now a plain data bag — `root`, `bricks`,
+`maxStep`, `fingerprint` — populated by `initFeatures()`; it no longer carries
+`setExplode` / `setStep` / `selectBrick` / `deselect` as callable methods. Those
+live instead on the API objects `main.js` builds and wires together at load time:
+
+```js
+const features = initFeatures(model);                          // → { view, bricks, maxStep, fingerprint,
+                                                                 //     setView, setHidden, unhideLast,
+                                                                 //     showAllHidden, hiddenIndices, dispose }
+const hotspots = initHotspots({ camera, renderer, features, libraryPath });
+                                                                 // → { selectedIndex, selectBrick, deselect, dispose }
+const state    = initStateSync({ camera, controls, features, hotspots });
+                                                                 // → { scheduleWrite, restore, dispose }
+
+features.onChange = state.scheduleWrite;   // one notification path per module —
+hotspots.onChange = state.scheduleWrite;   // no more DOM-as-state-store / dispatchEvent
+state.restore();
+```
+
+This is a bigger surface to reach into from the console than the old
+`model.setExplode(...)` one-liner, but it's not reachable from `window.viewer`
+directly — these are local variables in `main.js`'s `onModelLoaded()`. Add a
+debug line there (e.g. `window.features = features`) if you need console access
+to them.
 
 - **Isolate / colour-by:** `model.bricks` groups every brick with its step —
   tint by `step` for a build-order heatmap, or filter by `group.userData.fileName`

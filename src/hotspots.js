@@ -2,22 +2,22 @@ import * as THREE from 'three';
 
 // Click-to-inspect hotspots. Raycasts against the brick meshes, resolves the hit
 // back to its brick group (the tagged Object3D carrying the LDraw metadata),
-// highlights it, and shows a details panel. Reuses model.bricks from features.js.
+// highlights it, and shows a details panel. Reuses features.bricks from features.js.
 
 const HIGHLIGHT = 0x37c0ff;        // selection colour (emissive glow + box)
 const DRAG_THRESHOLD = 5;          // px of pointer travel that counts as an orbit, not a click
 
-export function initHotspots({ THREE: _THREE, scene, camera, renderer, model, libraryPath }) {
+export function initHotspots({ camera, renderer, features, libraryPath }) {
   const dom = renderer.domElement;
 
   // mesh -> brick entry, and a flat list of pickable meshes
   const meshToBrick = new Map();
-  for (const b of model.bricks) b.group.traverse((o) => { if (o.isMesh) meshToBrick.set(o, b); });
+  for (const b of features.bricks) b.group.traverse((o) => { if (o.isMesh) meshToBrick.set(o, b); });
   const targets = [...meshToBrick.keys()];
 
   // how many of each part number are in the build (for the "In this build" line)
   const countByPart = new Map();
-  for (const b of model.bricks) {
+  for (const b of features.bricks) {
     const k = (b.group.userData.fileName || '').toLowerCase();
     countByPart.set(k, (countByPart.get(k) || 0) + 1);
   }
@@ -121,7 +121,7 @@ export function initHotspots({ THREE: _THREE, scene, camera, renderer, model, li
     el('ins-title').textContent = partNo;
     el('ins-num').textContent = partNo;
     el('ins-color').innerHTML = `<span class="swatch" style="background:${hex}"></span>${colName}`;
-    el('ins-step').textContent = `${brick.step} / ${model.maxStep}`;
+    el('ins-step').textContent = `${brick.step} / ${features.maxStep}`;
     el('ins-count').textContent = `${countByPart.get(fileName.toLowerCase()) || 1}×`;
     el('ins-desc').textContent = '…';
     panel.classList.remove('hidden');
@@ -142,15 +142,15 @@ export function initHotspots({ THREE: _THREE, scene, camera, renderer, model, li
   function selectBrick(brick) {
     highlight(brick);
     showPanel(brick, firstMesh(brick.group));
-    model.selectedIndex = model.bricks.indexOf(brick);
-    model.onSelectionChange?.();
+    selectedIndex = brick.index;
+    api.onChange?.();
   }
 
   function deselect() {
     clearHighlight();
     hidePanel();
-    model.selectedIndex = null;
-    model.onSelectionChange?.();
+    selectedIndex = null;
+    api.onChange?.();
   }
 
   // ---- picking -------------------------------------------------------------
@@ -169,8 +169,8 @@ export function initHotspots({ THREE: _THREE, scene, camera, renderer, model, li
 
   // distinguish a click from an orbit-drag
   let down = null;
-  dom.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY }; });
-  dom.addEventListener('pointerup', (e) => {
+  const onPointerDown = (e) => { down = { x: e.clientX, y: e.clientY }; };
+  const onPointerUp = (e) => {
     if (!down) return;
     const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
     down = null;
@@ -178,17 +178,20 @@ export function initHotspots({ THREE: _THREE, scene, camera, renderer, model, li
     const res = pick(e.clientX, e.clientY);
     if (res) selectBrick(res.brick);
     else deselect();
-  });
+  };
+  dom.addEventListener('pointerdown', onPointerDown);
+  dom.addEventListener('pointerup', onPointerUp);
 
   // hover cursor feedback (throttled)
   let lastHover = 0;
-  dom.addEventListener('pointermove', (e) => {
+  const onPointerMove = (e) => {
     if (down) return;
     const now = performance.now();
     if (now - lastHover < 60) return;
     lastHover = now;
     dom.style.cursor = pick(e.clientX, e.clientY) ? 'pointer' : '';
-  });
+  };
+  dom.addEventListener('pointermove', onPointerMove);
 
   // Hide the selected brick. deselect() must run FIRST: it restores the saved
   // materials and unparents the highlight box. Skipping it would leave the
@@ -197,20 +200,35 @@ export function initHotspots({ THREE: _THREE, scene, camera, renderer, model, li
     if (!selected) return;
     const brick = selected;
     deselect();
-    model.setHidden(brick, true);
+    features.setHidden(brick, true);
   }
 
   el('ins-close').addEventListener('click', deselect);
   el('ins-hide').addEventListener('click', hideSelected);
-  window.addEventListener('keydown', (e) => {
+  function onKeydown(e) {
     if (e.target instanceof HTMLInputElement) return;
     if (e.key === 'Escape') deselect();
     else if (e.key.toLowerCase() === 'h' && !e.metaKey && !e.ctrlKey && !e.altKey) hideSelected();
-  });
+  }
+  window.addEventListener('keydown', onKeydown);
 
-  // expose for console / other features (also used by state.js to restore a
-  // deep-linked selection)
-  model.selectedIndex = null;
-  model.selectBrick = selectBrick;
-  model.deselect = deselect;
+  // ---- public API ------------------------------------------------------------
+  let selectedIndex = null;
+  const api = {
+    get selectedIndex() { return selectedIndex; },
+    selectBrick,
+    deselect,
+    onChange: null, // assigned by main.js
+    dispose() {
+      clearHighlight();
+      hidePanel();
+      dom.removeEventListener('pointerdown', onPointerDown);
+      dom.removeEventListener('pointerup', onPointerUp);
+      dom.removeEventListener('pointermove', onPointerMove);
+      el('ins-close').removeEventListener('click', deselect);
+      el('ins-hide').removeEventListener('click', hideSelected);
+      window.removeEventListener('keydown', onKeydown);
+    },
+  };
+  return api;
 }

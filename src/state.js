@@ -47,9 +47,11 @@ function notice(msg) {
   notice.timer = setTimeout(() => el.classList.add('hidden'), NOTICE_MS);
 }
 
-export function initStateSync({ model, camera, controls }) {
-  const explodeEl = document.getElementById('explode');
-  const stepEl = document.getElementById('step');
+// Wires camera + features + hotspots into the URL hash. Construction only sets
+// up writers; call the returned restore() afterwards, once features.onChange /
+// hotspots.onChange are wired to scheduleWrite, so a restored selection or
+// hidden brick is suppressed by `restoring` rather than silently written back.
+export function initStateSync({ camera, controls, features, hotspots }) {
   const shareBtn = document.getElementById('share');
 
   let restoring = true;   // suppresses writes while we apply the initial URL state
@@ -57,11 +59,11 @@ export function initStateSync({ model, camera, controls }) {
 
   function currentState() {
     const s = {};
-    if (explodeEl.valueAsNumber > 0) s.e = explodeEl.valueAsNumber;
-    if (stepEl.valueAsNumber < model.maxStep) s.s = stepEl.valueAsNumber;
-    if (model.selectedIndex != null) s.p = model.selectedIndex;
-    if (model.hiddenIndices.length) s.h = model.hiddenIndices.join(',');
-    if (s.p != null || s.h != null) s.v = model.fingerprint;
+    if (features.view.explode > 0) s.e = Math.round(features.view.explode * 100);
+    if (features.view.step < features.maxStep) s.s = features.view.step;
+    if (hotspots.selectedIndex != null) s.p = hotspots.selectedIndex;
+    if (features.hiddenIndices.length) s.h = features.hiddenIndices.join(',');
+    if (s.p != null || s.h != null) s.v = features.fingerprint;
     if (cameraTouched) {
       s.cx = round(camera.position.x); s.cy = round(camera.position.y); s.cz = round(camera.position.z);
       s.tx = round(controls.target.x); s.ty = round(controls.target.y); s.tz = round(controls.target.z);
@@ -82,49 +84,52 @@ export function initStateSync({ model, camera, controls }) {
     debouncedWrite();
   }
 
-  // ---- restore from URL (once) ---------------------------------------------
-  const initial = parseHash();
-  if (initial.e != null) { explodeEl.value = initial.e; explodeEl.dispatchEvent(new Event('input')); }
-  if (initial.s != null) { stepEl.value = initial.s; stepEl.dispatchEvent(new Event('input')); }
-  if (initial.cx != null) {
-    camera.position.set(+initial.cx, +initial.cy, +initial.cz);
-    controls.target.set(+initial.tx, +initial.ty, +initial.tz);
-    controls.update();
-    cameraTouched = true;
-  }
-  // p=/h= are positional indices into model.bricks — meaningless if the brick
-  // list has changed shape since the link was made (reorder/insert/delete), and
-  // silently resolving to the wrong brick is worse than not resolving at all.
-  // A missing v counts as a mismatch (old links predate the fingerprint).
-  const brickRefs = initial.p != null || initial.h != null;
-  if (brickRefs && initial.v !== model.fingerprint) {
-    delete initial.p; delete initial.h;
-    notice('This link was made from a different version of the model — the highlighted and hidden bricks could not be restored.');
-  }
-  // Hidden bricks before the selection: a brick that's both hidden and selected is
-  // contradictory (you'd get an info panel for something invisible), so hidden wins.
-  if (initial.h != null) {
-    for (const i of initial.h.split(',')) {
-      const brick = model.bricks[+i];
-      if (brick) model.setHidden(brick, true);
+  // ---- restore from URL (once) -----------------------------------------------
+  function restore() {
+    const initial = parseHash();
+    if (initial.e != null) features.setView({ explode: (+initial.e) / 100 });
+    if (initial.s != null) features.setView({ step: +initial.s });
+    if (initial.cx != null) {
+      camera.position.set(+initial.cx, +initial.cy, +initial.cz);
+      controls.target.set(+initial.tx, +initial.ty, +initial.tz);
+      controls.update();
+      cameraTouched = true;
     }
+    // p=/h= are positional indices into features.bricks — meaningless if the brick
+    // list has changed shape since the link was made (reorder/insert/delete), and
+    // silently resolving to the wrong brick is worse than not resolving at all.
+    // A missing v counts as a mismatch (old links predate the fingerprint).
+    const brickRefs = initial.p != null || initial.h != null;
+    if (brickRefs && initial.v !== features.fingerprint) {
+      delete initial.p; delete initial.h;
+      notice('This link was made from a different version of the model — the highlighted and hidden bricks could not be restored.');
+    }
+    // Hidden bricks before the selection: a brick that's both hidden and selected is
+    // contradictory (you'd get an info panel for something invisible), so hidden wins.
+    if (initial.h != null) {
+      for (const i of initial.h.split(',')) {
+        const brick = features.bricks[+i];
+        if (brick) features.setHidden(brick, true);
+      }
+    }
+    if (initial.p != null) {
+      const brick = features.bricks[+initial.p];
+      if (brick && !brick.hidden) hotspots.selectBrick(brick);
+    }
+    restoring = false;
   }
-  if (initial.p != null) {
-    const brick = model.bricks[+initial.p];
-    if (brick && !brick.hidden) model.selectBrick(brick);
-  }
-  restoring = false;
 
-  // ---- wire up writers -------------------------------------------------------
-  explodeEl.addEventListener('input', scheduleWrite);
-  stepEl.addEventListener('input', scheduleWrite);
-  controls.addEventListener('change', () => { cameraTouched = true; scheduleWrite(); });
-  model.onFeatureChange = scheduleWrite;   // called by features.js during Play
-  model.onSelectionChange = scheduleWrite; // called by hotspots.js on select/deselect
+  // ---- wire up writers ---------------------------------------------------------
+  // features.onChange / hotspots.onChange are wired by main.js to scheduleWrite —
+  // that's the single notification path for explode/step/selection/hidden changes.
+  // Camera is the one input this module still listens for directly.
+  const onControlsChange = () => { cameraTouched = true; scheduleWrite(); };
+  controls.addEventListener('change', onControlsChange);
 
-  // ---- share button ----------------------------------------------------------
+  // ---- share button ------------------------------------------------------------
+  let onShareClick;
   if (shareBtn) {
-    shareBtn.addEventListener('click', async () => {
+    onShareClick = async () => {
       writeHash(); // flush immediately so the copied link reflects the current view
       try {
         await navigator.clipboard.writeText(location.href);
@@ -134,6 +139,16 @@ export function initStateSync({ model, camera, controls }) {
       } catch {
         prompt('Copy this link:', location.href); // clipboard API unavailable (e.g. http, permissions)
       }
-    });
+    };
+    shareBtn.addEventListener('click', onShareClick);
   }
+
+  return {
+    scheduleWrite,
+    restore,
+    dispose() {
+      controls.removeEventListener('change', onControlsChange);
+      if (shareBtn && onShareClick) shareBtn.removeEventListener('click', onShareClick);
+    },
+  };
 }

@@ -38,6 +38,10 @@ function collectBricks(root) {
   return bricks;
 }
 
+// Returns an API object ({ view, bricks, maxStep, fingerprint, setView, setHidden,
+// unhideLast, showAllHidden, hiddenIndices, onChange, dispose }) and, as a side
+// effect, stamps model.bricks / model.maxStep / model.fingerprint with the same
+// data — model stays the plain data bag; this is the behaviour that operates on it.
 export function initFeatures(model) {
   const root = model.root;
   const bricks = collectBricks(root);
@@ -56,7 +60,7 @@ export function initFeatures(model) {
   const bbox = new THREE.Box3();
 
   let maxStep = 0;
-  const entries = bricks.map((group) => {
+  const entries = bricks.map((group, index) => {
     // Use the brick's geometric centre (world bbox centre), not its group origin.
     // Big parts like the nose cones have their LDraw origin offset from where the
     // geometry actually sits, which would skew the radial explode direction.
@@ -84,60 +88,39 @@ export function initFeatures(model) {
       localDir.multiplyScalar(EXPLODE_SCALE).addScaledVector(unit, EXPLODE_BASE);
     }
 
-    return { group, step, home: group.position.clone(), dir: localDir, hidden: false };
+    // Own index, so hiddenIndices doesn't need an indexOf scan over ~1,181 entries
+    // per hidden brick.
+    return { group, step, home: group.position.clone(), dir: localDir, hidden: false, index };
   });
 
   model.bricks = entries;
   model.maxStep = maxStep;
   model.fingerprint = fingerprintOf(entries);
 
-  function setExplode(amount) {
-    // e.dir already encodes the displacement at 100%; just scale by the slider.
+  // ---- view state ------------------------------------------------------------
+  // The single source of truth for explode/step. Sliders render from it and
+  // write to it via setView() — one notification path, instead of the slider
+  // 'input' event and Play-build's programmatic .value set needing separate
+  // handling.
+  const api = { view: { explode: 0, step: maxStep } };
+  const view = api.view;
+
+  function applyExplode(amount) {
+    // dir already encodes the displacement at 100%; just scale by the slider.
     // The slider runs to 300%, so `amount` is 0..3 — nothing here caps it, and
     // the console can push it further still.
     for (const e of entries) e.group.position.copy(e.home).addScaledVector(e.dir, amount);
   }
-  // ---- visibility ----------------------------------------------------------
+  // ---- visibility ------------------------------------------------------------
   // Two independent things suppress a brick: the build-step scrubber and the
   // per-brick hide. They must not fight, so this is the ONLY writer of
-  // group.visible — anything that changes either input calls it.
-  let currentStep = maxStep;
+  // group.visible — anything that changes either input goes through render().
   function applyVisibility() {
-    for (const e of entries) e.group.visible = e.step <= currentStep && !e.hidden;
-  }
-  function setStep(step) {
-    currentStep = step;
-    applyVisibility();
+    for (const e of entries) e.group.visible = e.step <= view.step && !e.hidden;
   }
 
   // Hidden bricks, most-recent-last, so `U` can walk back out of a peel.
   const hiddenStack = [];
-
-  function setHidden(brick, flag) {
-    if (!brick || !!brick.hidden === !!flag) return;
-    brick.hidden = !!flag;
-    if (flag) hiddenStack.push(brick);
-    else hiddenStack.splice(hiddenStack.indexOf(brick), 1);
-    afterHiddenChange();
-  }
-  function unhideLast() {
-    const brick = hiddenStack.pop();
-    if (!brick) return;
-    brick.hidden = false;
-    afterHiddenChange();
-  }
-  function showAllHidden() {
-    if (!hiddenStack.length) return;
-    for (const e of hiddenStack) e.hidden = false;
-    hiddenStack.length = 0;
-    afterHiddenChange();
-  }
-  function afterHiddenChange() {
-    applyVisibility();
-    updateStepLabel(currentStep);
-    updateShowAllBtn();
-    model.onFeatureChange?.(); // persist to the URL hash
-  }
 
   // ---- UI wiring -----------------------------------------------------------
   const panel = document.getElementById('controls');
@@ -149,7 +132,6 @@ export function initFeatures(model) {
   const showAllBtn = document.getElementById('show-all');
 
   stepEl.max = String(maxStep);
-  stepEl.value = String(maxStep);
 
   function updateStepLabel(step) {
     // Count what's actually on screen, so hidden bricks don't inflate the total.
@@ -164,21 +146,54 @@ export function initFeatures(model) {
     showAllBtn.textContent = `↺ Show all (${n})`;
     showAllBtn.classList.toggle('gone', n === 0);
   }
-  updateStepLabel(maxStep);
-  updateShowAllBtn();
 
-  explodeEl.addEventListener('input', () => {
-    const a = explodeEl.valueAsNumber / 100;
-    explodeVal.textContent = `${explodeEl.valueAsNumber}%`;
-    setExplode(a);
-  });
+  // Reflect `view` (and the hidden set) onto the 3D scene and the DOM. The one
+  // place that runs after every change, whatever triggered it.
+  function render() {
+    applyExplode(view.explode);
+    applyVisibility();
+    explodeEl.value = String(Math.round(view.explode * 100));
+    explodeVal.textContent = `${explodeEl.value}%`;
+    stepEl.value = String(view.step);
+    updateStepLabel(view.step);
+    updateShowAllBtn();
+  }
 
-  stepEl.addEventListener('input', () => {
-    stopPlay();
-    const s = stepEl.valueAsNumber;
-    setStep(s);
-    updateStepLabel(s);
-  });
+  function setView(patch) {
+    Object.assign(view, patch);
+    render();
+    api.onChange?.();
+  }
+
+  function setHidden(brick, flag) {
+    if (!brick || !!brick.hidden === !!flag) return;
+    brick.hidden = !!flag;
+    if (flag) hiddenStack.push(brick);
+    else hiddenStack.splice(hiddenStack.indexOf(brick), 1);
+    render();
+    api.onChange?.();
+  }
+  function unhideLast() {
+    const brick = hiddenStack.pop();
+    if (!brick) return;
+    brick.hidden = false;
+    render();
+    api.onChange?.();
+  }
+  function showAllHidden() {
+    if (!hiddenStack.length) return;
+    for (const e of hiddenStack) e.hidden = false;
+    hiddenStack.length = 0;
+    render();
+    api.onChange?.();
+  }
+
+  render(); // sync sliders/labels to the initial view before anything can change it
+
+  const onExplodeInput = () => setView({ explode: explodeEl.valueAsNumber / 100 });
+  const onStepInput = () => { stopPlay(); setView({ step: stepEl.valueAsNumber }); };
+  explodeEl.addEventListener('input', onExplodeInput);
+  stepEl.addEventListener('input', onStepInput);
 
   // ---- Play build animation ------------------------------------------------
   let playRAF = null;
@@ -186,46 +201,56 @@ export function initFeatures(model) {
     if (playRAF != null) { cancelAnimationFrame(playRAF); playRAF = null; playBtn.textContent = '▶ Play build'; }
   }
   function startPlay() {
-    const startStep = stepEl.valueAsNumber >= maxStep ? 0 : stepEl.valueAsNumber;
+    const startStep = view.step >= maxStep ? 0 : view.step;
     const t0 = performance.now();
     playBtn.textContent = '⏸ Pause';
     const tick = (now) => {
       const frac = startStep / maxStep + (now - t0) / (PLAY_SECONDS * 1000);
       const s = Math.min(maxStep, Math.round(frac * maxStep));
-      stepEl.value = String(s);
-      setStep(s);
-      updateStepLabel(s);
-      model.onFeatureChange?.(); // let state.js debounce-persist the step as it plays
+      setView({ step: s });
       if (s >= maxStep) { stopPlay(); return; }
       playRAF = requestAnimationFrame(tick);
     };
     playRAF = requestAnimationFrame(tick);
   }
-  playBtn.addEventListener('click', () => (playRAF == null ? startPlay() : stopPlay()));
+  const onPlayClick = () => (playRAF == null ? startPlay() : stopPlay());
+  playBtn.addEventListener('click', onPlayClick);
 
   // ---- hide / restore ------------------------------------------------------
   showAllBtn.addEventListener('click', showAllHidden);
 
   // A hidden brick can't be clicked (hotspots.js skips invisible bricks), so
   // un-hiding has to come from here: `U`, or Cmd/Ctrl+Z for the usual reflex.
-  window.addEventListener('keydown', (e) => {
+  function onKeydown(e) {
     if (e.target instanceof HTMLInputElement) return; // don't steal slider keys
     const undoChord = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z';
     if (!undoChord && (e.key.toLowerCase() !== 'u' || e.metaKey || e.ctrlKey || e.altKey)) return;
     if (undoChord) e.preventDefault(); // don't fall through to browser undo
     unhideLast();
-  });
+  }
+  window.addEventListener('keydown', onKeydown);
 
   panel.classList.add('ready');
 
-  // Expose for the console / other modules (hotspots.js hides the selected
-  // brick; state.js serialises the hidden set into the URL).
-  model.setExplode = setExplode;
-  model.setStep = setStep;
-  model.setHidden = setHidden;
-  model.unhideLast = unhideLast;
-  model.showAllHidden = showAllHidden;
-  Object.defineProperty(model, 'hiddenIndices', {
-    get: () => hiddenStack.map((b) => entries.indexOf(b)),
+  api.bricks = entries;
+  api.maxStep = maxStep;
+  api.fingerprint = model.fingerprint;
+  api.setView = setView;
+  api.setHidden = setHidden;
+  api.unhideLast = unhideLast;
+  api.showAllHidden = showAllHidden;
+  api.onChange = null; // assigned by main.js
+  Object.defineProperty(api, 'hiddenIndices', {
+    get: () => hiddenStack.map((b) => b.index),
   });
+  api.dispose = () => {
+    stopPlay();
+    explodeEl.removeEventListener('input', onExplodeInput);
+    stepEl.removeEventListener('input', onStepInput);
+    playBtn.removeEventListener('click', onPlayClick);
+    showAllBtn.removeEventListener('click', showAllHidden);
+    window.removeEventListener('keydown', onKeydown);
+  };
+
+  return api;
 }

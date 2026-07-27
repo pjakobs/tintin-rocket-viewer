@@ -57,13 +57,18 @@ fill.position.set(-1, 0.3, -0.7);
 scene.add(fill);
 
 // ---------------------------------------------------------------------------
-// Model state (exposed for later hotspot / build-progress work)
+// Model state — plain data, populated here and by initFeatures(). Behaviour
+// (explode/step/selection/hide) lives on the objects features.js and
+// hotspots.js return, not on this object.
 // ---------------------------------------------------------------------------
 export const model = {
-  root: null,          // THREE.Group of the whole build
-  parts: [],           // [{ object, partId, step }] — one per placed brick
-  numSteps: 0,         // number of LDraw build steps (0 STEP metas)
+  root: null,        // THREE.Group of the whole build
+  bricks: null,      // set by initFeatures(): [{ group, step, home, dir, hidden, index }]
+  maxStep: 0,        // set by initFeatures(): highest LDraw build step
+  fingerprint: null, // set by initFeatures(): order-sensitive hash of the brick list
 };
+
+let meshCount = 0; // placed meshes, for the HUD's "Meshes drawn" row
 
 // Missing-part tally: the loader's LoadingManager reports a failed fetch for
 // each part it can't retrieve. See updateHUD() — this is the "very easy to
@@ -160,24 +165,19 @@ function onModelLoaded(group, modelText) {
     }
   });
 
-  // Tag every placed part so hotspots/build-progress can address them later.
-  group.traverse((child) => {
-    if (child.isMesh) {
-      const partId = child.userData?.fileName || child.parent?.userData?.fileName || null;
-      const step = child.userData?.constructionStep ?? child.parent?.userData?.constructionStep ?? 0;
-      model.parts.push({ object: child, partId, step });
-    }
-  });
+  group.traverse((child) => { if (child.isMesh) meshCount++; });
 
   model.root = group;
-  model.numSteps = group.userData?.numBuildingSteps || 0;
   scene.add(group);
 
   frameModel(group);
   updateHUD();
-  initFeatures(model);
-  initHotspots({ THREE, scene, camera, renderer, controls, model, libraryPath: LIBRARY_PATH });
-  initStateSync({ model, camera, controls });
+  const features = initFeatures(model);
+  const hotspots = initHotspots({ camera, renderer, features, libraryPath: LIBRARY_PATH });
+  const state = initStateSync({ camera, controls, features, hotspots });
+  features.onChange = state.scheduleWrite;
+  hotspots.onChange = state.scheduleWrite;
+  state.restore();
 
   statusEl.textContent = 'Ready';
   loadingEl.classList.add('hidden');
@@ -255,7 +255,7 @@ window.addEventListener('keydown', (e) => {
 });
 
 function updateHUD() {
-  document.getElementById('stat-parts').textContent = model.parts.length.toLocaleString();
+  document.getElementById('stat-parts').textContent = meshCount.toLocaleString();
   document.getElementById('stat-missing').textContent =
     missingParts.size ? `${missingParts.size} (${[...missingParts].join(', ')})` : '0';
 }
