@@ -112,7 +112,7 @@
       <div class="row"><span>Meshes drawn</span><span id="stat-parts">—</span></div>
       <div class="row"><span>Missing parts</span><span id="stat-missing">—</span></div>
       <div class="meta" id="stat-note" style="margin-top:6px"></div>
-      <div class="meta" style="margin-top:8px">Drag to orbit · scroll to zoom · right-drag to pan · R to recentre</div>
+      <div class="meta" id="hud-hint" style="margin-top:8px">Drag to orbit · scroll to zoom · right-drag to pan · R to recentre</div>
     </div>
     <div id="inspect" class="hidden">
       <div class="ins-head">
@@ -125,7 +125,7 @@
       <div class="row"><span>Build step</span><span id="ins-step">—</span></div>
       <div class="row"><span>In this build</span><span id="ins-count">—</span></div>
       <button id="ins-hide" title="Hide this brick (H)">Hide brick <span class="key">H</span></button>
-      <div class="ins-hint">Click a brick to inspect · Esc to close · U un-hides the last</div>
+      <div class="ins-hint" id="ins-hint">Click a brick to inspect · Esc to close · U un-hides the last</div>
     </div>
     <div id="controls">
       <div class="ctl">
@@ -135,7 +135,7 @@
       <div class="sep"></div>
       <div class="ctl">
         <div class="ctl-row"><label>Build step</label><span class="val" id="step-val">—</span></div>
-        <input id="step" type="range" min="0" max="360" value="360" />
+        <input id="step" type="range" min="0" />
       </div>
       <button id="play">▶ Play build</button>
       <button id="recentre" title="Undo panning: put the pivot back on the rocket's axis (R)">⌖ Recentre</button>

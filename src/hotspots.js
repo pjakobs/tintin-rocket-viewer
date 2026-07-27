@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { bindKey } from './keymap.js';
 
 // Click-to-inspect hotspots. Raycasts against the brick meshes, resolves the hit
 // back to its brick group (the tagged Object3D carrying the LDraw metadata),
@@ -205,12 +206,8 @@ export function initHotspots({ camera, renderer, features, libraryPath }) {
 
   el('ins-close').addEventListener('click', deselect);
   el('ins-hide').addEventListener('click', hideSelected);
-  function onKeydown(e) {
-    if (e.target instanceof HTMLInputElement) return;
-    if (e.key === 'Escape') deselect();
-    else if (e.key.toLowerCase() === 'h' && !e.metaKey && !e.ctrlKey && !e.altKey) hideSelected();
-  }
-  window.addEventListener('keydown', onKeydown);
+  bindKey('escape', deselect, { label: 'Esc to close' });
+  bindKey('h', hideSelected);
 
   // ---- public API ------------------------------------------------------------
   let selectedIndex = null;
@@ -227,7 +224,8 @@ export function initHotspots({ camera, renderer, features, libraryPath }) {
       dom.removeEventListener('pointermove', onPointerMove);
       el('ins-close').removeEventListener('click', deselect);
       el('ins-hide').removeEventListener('click', hideSelected);
-      window.removeEventListener('keydown', onKeydown);
+      // Keymap bindings aren't unregistered — keymap.js has no unbind, and
+      // dispose() isn't wired to anything yet (see the composition refactor).
     },
   };
   return api;

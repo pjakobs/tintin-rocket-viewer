@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { axisOfSymmetry } from './geometry.js';
+import { bindKey } from './keymap.js';
 
 // Interactive features driven off the per-part LDraw metadata:
 //  - Exploded view   : each brick slides radially away from the rocket's axis.
@@ -221,14 +222,8 @@ export function initFeatures(model) {
 
   // A hidden brick can't be clicked (hotspots.js skips invisible bricks), so
   // un-hiding has to come from here: `U`, or Cmd/Ctrl+Z for the usual reflex.
-  function onKeydown(e) {
-    if (e.target instanceof HTMLInputElement) return; // don't steal slider keys
-    const undoChord = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z';
-    if (!undoChord && (e.key.toLowerCase() !== 'u' || e.metaKey || e.ctrlKey || e.altKey)) return;
-    if (undoChord) e.preventDefault(); // don't fall through to browser undo
-    unhideLast();
-  }
-  window.addEventListener('keydown', onKeydown);
+  bindKey('u', unhideLast, { label: 'U un-hides the last' });
+  bindKey('mod+z', unhideLast, { preventDefault: true }); // don't fall through to browser undo
 
   panel.classList.add('ready');
 
@@ -249,7 +244,8 @@ export function initFeatures(model) {
     stepEl.removeEventListener('input', onStepInput);
     playBtn.removeEventListener('click', onPlayClick);
     showAllBtn.removeEventListener('click', showAllHidden);
-    window.removeEventListener('keydown', onKeydown);
+    // Keymap bindings aren't unregistered — keymap.js has no unbind, and
+    // dispose() isn't wired to anything yet (see the composition refactor).
   };
 
   return api;

@@ -225,6 +225,11 @@ src/main.js  ── scene / camera / renderer / lighting / LDrawLoader / frameMo
    │
    ├──▶ src/geometry.js   axisOfSymmetry()      (pure helper, no state)
    │
+   ├──▶ src/keymap.js     bindKey(combo, fn, { label }) / keyHints()
+   │        one keydown listener for the whole app, loud on a combo collision;
+   │        main.js / features.js / hotspots.js register into it instead of
+   │        each adding their own listener
+   │
    ├──▶ src/features.js   const features = initFeatures(model)
    │        collects "brick groups" → model.bricks[] (data stays on model)
    │        returns { view, bricks, maxStep, fingerprint, setView, setHidden,
@@ -269,7 +274,7 @@ window.viewer = { THREE, scene, camera, renderer, controls, model }   (console/d
 <h2 id="modules">4. Module reference</h2>
 
 <div class="card">
-  <h3>src/main.js <span style="color:var(--muted); font-weight:400; font-size:12px;">— 280 lines</span></h3>
+  <h3>src/main.js <span style="color:var(--muted); font-weight:400; font-size:12px;">— 287 lines</span></h3>
   <p>Entry point. Owns the Three.js scene, renderer, camera, lighting, and the <code>LDrawLoader</code>
   setup. Fetches and parses the model, counts placed meshes, frames the camera on load, and runs the
   render loop. Also implements <strong>Recentre</strong> (undoing pan drift in the orbit target) and
@@ -285,7 +290,7 @@ window.viewer = { THREE, scene, camera, renderer, controls, model }   (console/d
 </div>
 
 <div class="card">
-  <h3>src/features.js <span style="color:var(--muted); font-weight:400; font-size:12px;">— 256 lines</span></h3>
+  <h3>src/features.js <span style="color:var(--muted); font-weight:400; font-size:12px;">— 252 lines</span></h3>
   <p>Everything driven by the <em>Explode</em> and <em>Build step</em> sliders, plus per-brick
   hide/restore. Collects the ~1,181 "brick groups" (outermost <code>Object3D</code>s whose
   <code>userData.fileName</code> is a <code>.dat</code> part), stamps each with its own
@@ -306,7 +311,7 @@ window.viewer = { THREE, scene, camera, renderer, controls, model }   (console/d
 </div>
 
 <div class="card">
-  <h3>src/hotspots.js <span style="color:var(--muted); font-weight:400; font-size:12px;">— 234 lines</span></h3>
+  <h3>src/hotspots.js <span style="color:var(--muted); font-weight:400; font-size:12px;">— 232 lines</span></h3>
   <p>Click-to-inspect. Raycasts against a flat list of brick meshes, resolves a hit back to its
   brick group via a <code>mesh → brick</code> map built from <code>features.bricks</code>, and shows
   an emissive-material highlight plus an oriented <code>Box3Helper</code> computed in the brick's own
@@ -319,7 +324,7 @@ window.viewer = { THREE, scene, camera, renderer, controls, model }   (console/d
     <tr><td><code>selectBrick(brick)</code> / <code>deselect()</code></td><td>public entry points, also used by <code>state.js</code> to restore a deep-linked selection; own <code>selectedIndex</code> and call <code>onChange</code> directly via <code>brick.index</code>, no <code>indexOf</code> scan</td></tr>
     <tr><td><code>pick(x, y)</code></td><td>raycast helper; skips bricks hidden by the step scrubber</td></tr>
     <tr><td><code>hideSelected()</code></td><td>deselects first (restoring materials) then calls <code>features.setHidden</code></td></tr>
-    <tr><td><code>dispose()</code></td><td>removes pointer/keydown listeners and clears the current highlight</td></tr>
+    <tr><td><code>dispose()</code></td><td>removes the pointer listeners and clears the current highlight (keymap bindings aren't unregistered — see <code>keymap.js</code>)</td></tr>
   </table>
 </div>
 
@@ -335,6 +340,18 @@ window.viewer = { THREE, scene, camera, renderer, controls, model }   (console/d
   <code>features.onChange</code> / <code>hotspots.onChange</code> are wired, replaying the hash in a
   fixed order — hidden bricks before selection, so a brick that's both hidden and selected stays
   hidden. The <code>restoring</code> flag suppresses <code>scheduleWrite</code> during that replay.</p>
+</div>
+
+<div class="card">
+  <h3>src/keymap.js <span style="color:var(--muted); font-weight:400; font-size:12px;">— 33 lines</span></h3>
+  <p>One <code>window.addEventListener('keydown', …)</code> for the whole app, replacing three
+  independent registrations (in <code>main.js</code>, <code>features.js</code>, <code>hotspots.js</code>)
+  that each re-implemented the "don't steal slider keys" guard and hand-rolled modifier checks in
+  three different shapes. <code>bindKey(combo, fn, { label })</code> throws on a duplicate
+  <code>combo</code> instead of silently letting a later binding shadow an earlier one.
+  <code>keyHints()</code> returns <code>{ combo: label }</code> for every labelled binding, so the two
+  on-screen hint strings (HUD, inspect panel) are rendered from the same source of truth as the
+  bindings themselves rather than hand-kept in sync with them.</p>
 </div>
 
 <div class="card">
@@ -451,7 +468,7 @@ node scripts/prune-library.mjs --apply    # 2. slim to public/ldraw-min/</code><
     tintin-rocket.ldr          # the model — MPD, 36 submodels, 1,181 bricks
     rebrickable_parts.csv      # manual-derived parts list, for crosscheck.js
   ldraw-min/                   # slim LDraw library (parts/, p/, LDConfig.ldr) — ~2.7 MB, committed
-src/                           # the 6 modules described above
+src/                           # the 7 modules described above
 scripts/                       # offline generators, described above
 references/                    # untouched original source files
   minifig-gear.ldr             # the 74 split-out bricks, a standalone MPD

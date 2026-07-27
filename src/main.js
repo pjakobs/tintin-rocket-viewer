@@ -7,6 +7,7 @@ import { initFeatures } from './features.js';
 import { initHotspots } from './hotspots.js';
 import { initStateSync } from './state.js';
 import { axisOfSymmetry } from './geometry.js';
+import { bindKey, keyHints } from './keymap.js';
 
 const MODEL_URL = '/model/tintin-rocket.ldr';
 // Slim LDraw library holding only the ~535 parts/primitives this model uses
@@ -179,6 +180,15 @@ function onModelLoaded(group, modelText) {
   hotspots.onChange = state.scheduleWrite;
   state.restore();
 
+  // Refresh the two hint strings from the keymap now that features.js and
+  // hotspots.js have registered their bindings, so the shortcuts shown can't
+  // drift from what's actually bound.
+  const hints = keyHints();
+  document.getElementById('hud-hint').textContent =
+    `Drag to orbit · scroll to zoom · right-drag to pan · ${hints.r}`;
+  document.getElementById('ins-hint').textContent =
+    `Click a brick to inspect · ${hints.escape} · ${hints.u}`;
+
   statusEl.textContent = 'Ready';
   loadingEl.classList.add('hidden');
 
@@ -249,10 +259,7 @@ function recentre() {
 }
 
 document.getElementById('recentre').addEventListener('click', recentre);
-window.addEventListener('keydown', (e) => {
-  if (e.target instanceof HTMLInputElement) return; // don't steal slider keys
-  if (e.key.toLowerCase() === 'r' && !e.metaKey && !e.ctrlKey && !e.altKey) recentre();
-});
+bindKey('r', recentre, { label: 'R to recentre' });
 
 function updateHUD() {
   document.getElementById('stat-parts').textContent = meshCount.toLocaleString();
