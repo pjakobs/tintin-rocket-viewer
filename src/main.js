@@ -65,15 +65,10 @@ export const model = {
   numSteps: 0,         // number of LDraw build steps (0 STEP metas)
 };
 
-// Missing-part tally: LDrawLoader warns on parts it can't fetch. Intercept to count.
+// Missing-part tally: the loader's LoadingManager reports a failed fetch for
+// each part it can't retrieve. See updateHUD() — this is the "very easy to
+// miss" failure the README warns about, so it gets its own HUD row.
 const missingParts = new Set();
-const origWarn = console.warn.bind(console);
-console.warn = (...args) => {
-  const msg = args.join(' ');
-  const m = msg.match(/(?:Could not|Unable to).*?([\w-]+\.dat)/i) || msg.match(/([\w-]+\.dat).*?(?:not found|404)/i);
-  if (m) missingParts.add(m[1].toLowerCase());
-  origWarn(...args);
-};
 
 // ---------------------------------------------------------------------------
 // Load
@@ -90,7 +85,27 @@ function failLoad(err, msg) {
   statusEl.textContent = 'Load failed';
 }
 
-const loader = new LDrawLoader();
+// LDrawLoader.fetchData() retries each subobject across several base paths
+// (parts/, p/, models/, ...) before giving up, and FileLoader's `.finally()`
+// calls itemEnd(url) on every attempt regardless of outcome — so onProgress
+// fires right after onError for the very same failed URL. Track which exact
+// URLs errored so a same-URL itemEnd is recognised as that failure's
+// companion call, while an itemEnd for a *different* URL (the next location
+// tried) is recognised as the real success and retracts the false positive.
+const erroredUrls = new Set();
+const manager = new THREE.LoadingManager();
+manager.onError = (url) => {
+  if (!/\.dat$/i.test(url)) return;
+  erroredUrls.add(url);
+  missingParts.add(url.split('/').pop().toLowerCase());
+  updateHUD();
+};
+manager.onProgress = (url) => {
+  if (erroredUrls.has(url)) return; // this is the failed attempt's own itemEnd
+  if (missingParts.delete(url.split('/').pop().toLowerCase())) updateHUD();
+};
+
+const loader = new LDrawLoader(manager);
 loader.smoothNormals = true;
 loader.setPartsLibraryPath(LIBRARY_PATH);
 // Required since three r165+: the loader needs an explicit material for the
