@@ -12,7 +12,7 @@ const WRITE_MAX_WAIT_MS = 600;   // ...but never wait longer than this since the
 // for a long time after a drag (inertia decaying toward a tiny epsilon), which
 // would otherwise keep resetting a plain debounce and delay the URL update far
 // longer than feels responsive.
-function debounceWithMaxWait(fn, wait, maxWait) {
+export function debounceWithMaxWait(fn, wait, maxWait) {
   let timer = null;
   let maxTimer = null;
   return () => {
@@ -23,7 +23,7 @@ function debounceWithMaxWait(fn, wait, maxWait) {
   };
 }
 
-function parseHash() {
+export function parseHash() {
   const h = location.hash.replace(/^#/, '');
   const out = {};
   if (!h) return out;

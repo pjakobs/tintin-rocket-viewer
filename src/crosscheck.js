@@ -42,7 +42,7 @@ export function expandLdr(text) {
 function baseId(id) { return id.replace(/\.dat$/, '').toLowerCase(); }
 
 // Parse rebrickable CSV: Part,Color,Quantity,Is Spare
-function parseCsv(text) {
+export function parseCsv(text) {
   const rows = text.split(/\r?\n/).filter(Boolean);
   rows.shift(); // header
   const counts = {};

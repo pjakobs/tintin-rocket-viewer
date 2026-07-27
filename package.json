@@ -8,10 +8,13 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "deploy": "vercel build --prod && vercel deploy --prebuilt --prod"
+    "deploy": "vercel build --prod && vercel deploy --prebuilt --prod",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
-    "vite": "^6.0.0"
+    "vite": "^6.0.0",
+    "vitest": "^4.1.10"
   },
   "dependencies": {
     "three": "^0.171.0"
