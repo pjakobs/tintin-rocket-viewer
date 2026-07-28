@@ -17,6 +17,7 @@
     "vitest": "^4.1.10"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
     "three": "^0.171.0"
   }
 }
