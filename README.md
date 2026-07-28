@@ -288,17 +288,18 @@ is the single source of truth for the sliders, updated via
 
 ## Deploying
 
-Deployed to Vercel from prebuilt output (`npm run deploy`, i.e.
-`vercel build --prod && vercel deploy --prebuilt --prod`) rather than letting
+The GitHub repo is connected to Vercel (Vercel dashboard → Project → Settings →
+Git), so **pushing to `main` auto-deploys** — Vercel clones the repo and builds
+it server-side on every push, no local step required.
+
+`npm run deploy` (i.e. `vercel build --prod && vercel deploy --prebuilt --prod`)
+remains available for a manual/local deploy — e.g. to publish uncommitted
+changes, or if you ever need to deploy from a machine without git push access.
+It builds locally and uploads only the prebuilt output, rather than letting
 Vercel build from raw source — a plain `vercel --prod` tries to upload the whole
 working directory and hits Vercel's 15,000-file cap (mostly `node_modules`).
-First-time setup: `npx vercel link` to connect this directory to a Vercel
-project, then `npm run deploy`.
-
-The GitHub repo is private, so **auto-deploy on push isn't connected** — Vercel's
-CLI can't authorize a private repo without a one-time consent flow in the
-browser (Vercel dashboard → Project → Settings → Git → Connect). Until then,
-`npm run deploy` is the way to publish changes.
+First-time setup for this path: `npx vercel link` to connect this directory to
+a Vercel project.
 
 ## Extending it further
 
