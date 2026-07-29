@@ -3,6 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { LDrawLoader } from 'three/addons/loaders/LDrawLoader.js';
 import { LDrawConditionalLineMaterial } from 'three/addons/materials/LDrawConditionalLineMaterial.js';
 import { inject } from '@vercel/analytics';
+import { injectSpeedInsights } from '@vercel/speed-insights';
 import { crossCheck } from './crosscheck.js';
 import { initFeatures } from './features.js';
 import { initHotspots } from './hotspots.js';
@@ -12,6 +13,9 @@ import { bindKey, keyHints } from './keymap.js';
 
 // Initialize Vercel Web Analytics
 inject();
+
+// Initialize Vercel Speed Insights
+injectSpeedInsights();
 
 const MODEL_URL = '/model/tintin-rocket.ldr';
 // Slim LDraw library holding only the ~535 parts/primitives this model uses
