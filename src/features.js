@@ -130,7 +130,10 @@ export function initFeatures(model) {
   const stepEl = document.getElementById('step');
   const stepVal = document.getElementById('step-val');
   const playBtn = document.getElementById('play');
+  const playIcon = playBtn.querySelector('.btn-icon');
+  const playLabel = playBtn.querySelector('.btn-label');
   const showAllBtn = document.getElementById('show-all');
+  const showAllLabel = showAllBtn.querySelector('.btn-label');
 
   stepEl.max = String(maxStep);
 
@@ -144,7 +147,7 @@ export function initFeatures(model) {
   }
   function updateShowAllBtn() {
     const n = hiddenStack.length;
-    showAllBtn.textContent = `↺ Show all (${n})`;
+    showAllLabel.textContent = `Show all (${n})`;
     showAllBtn.classList.toggle('gone', n === 0);
   }
 
@@ -199,12 +202,15 @@ export function initFeatures(model) {
   // ---- Play build animation ------------------------------------------------
   let playRAF = null;
   function stopPlay() {
-    if (playRAF != null) { cancelAnimationFrame(playRAF); playRAF = null; playBtn.textContent = '▶ Play build'; }
+    if (playRAF != null) {
+      cancelAnimationFrame(playRAF); playRAF = null;
+      playIcon.textContent = '▶'; playLabel.textContent = 'Play build';
+    }
   }
   function startPlay() {
     const startStep = view.step >= maxStep ? 0 : view.step;
     const t0 = performance.now();
-    playBtn.textContent = '⏸ Pause';
+    playIcon.textContent = '⏸'; playLabel.textContent = 'Pause';
     const tick = (now) => {
       const frac = startStep / maxStep + (now - t0) / (PLAY_SECONDS * 1000);
       const s = Math.min(maxStep, Math.round(frac * maxStep));

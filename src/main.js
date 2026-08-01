@@ -10,12 +10,15 @@ import { initHotspots } from './hotspots.js';
 import { initStateSync } from './state.js';
 import { axisOfSymmetry } from './geometry.js';
 import { bindKey, keyHints } from './keymap.js';
+import { initPanels } from './panels.js';
 
 // Initialize Vercel Web Analytics
 inject();
 
 // Initialize Vercel Speed Insights
 injectSpeedInsights();
+
+initPanels();
 
 const MODEL_URL = '/model/tintin-rocket.ldr';
 // Slim LDraw library holding only the ~535 parts/primitives this model uses

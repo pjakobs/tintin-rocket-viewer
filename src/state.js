@@ -129,13 +129,16 @@ export function initStateSync({ camera, controls, features, hotspots }) {
   // ---- share button ------------------------------------------------------------
   let onShareClick;
   if (shareBtn) {
+    const shareIcon = shareBtn.querySelector('.btn-icon');
+    const shareLabel = shareBtn.querySelector('.btn-label');
     onShareClick = async () => {
       writeHash(); // flush immediately so the copied link reflects the current view
       try {
         await navigator.clipboard.writeText(location.href);
-        const prev = shareBtn.textContent;
-        shareBtn.textContent = '✓ Copied';
-        setTimeout(() => { shareBtn.textContent = prev; }, 1400);
+        const prevIcon = shareIcon.textContent;
+        const prevLabel = shareLabel.textContent;
+        shareIcon.textContent = '✓'; shareLabel.textContent = 'Copied';
+        setTimeout(() => { shareIcon.textContent = prevIcon; shareLabel.textContent = prevLabel; }, 1400);
       } catch {
         prompt('Copy this link:', location.href); // clipboard API unavailable (e.g. http, permissions)
       }

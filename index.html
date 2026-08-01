@@ -22,6 +22,18 @@
       #hud .meta { color: #9aa0ac; font-size: 12px; }
       #hud .row { display: flex; justify-content: space-between; gap: 12px; }
       #hud .row span:last-child { color: #7dd3fc; font-variant-numeric: tabular-nums; }
+      #hud .hud-close { display: none; }
+
+      /* Collapsed stand-in for #hud on narrow screens — see the media query below. */
+      #hud-toggle {
+        display: none; position: fixed; top: 12px; left: 12px; z-index: 11;
+        width: 34px; height: 34px; border-radius: 50%;
+        background: rgba(20, 22, 28, 0.72); color: #7dd3fc;
+        border: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(6px);
+        align-items: center; justify-content: center;
+        font-size: 14px; font-weight: 700; cursor: pointer;
+      }
+      #hud-toggle.gone { display: none; }
 
       #loading {
         position: fixed; inset: 0; z-index: 20; display: grid; place-items: center;
@@ -38,13 +50,15 @@
 
       #controls {
         position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 10;
-        display: flex; align-items: center; gap: 18px;
+        display: flex; align-items: center; gap: 18px; flex-wrap: wrap; justify-content: center;
+        max-width: calc(100vw - 24px);
         background: rgba(20, 22, 28, 0.72); color: #e8eaf0;
         padding: 12px 18px; border-radius: 12px; backdrop-filter: blur(6px);
         border: 1px solid rgba(255,255,255,0.08); font-size: 12px;
         opacity: 0; pointer-events: none; transition: opacity 0.4s;
       }
       #controls.ready { opacity: 1; pointer-events: auto; }
+      #controls-sliders { display: flex; align-items: center; gap: 18px; }
       #controls .ctl { display: flex; flex-direction: column; gap: 4px; }
       #controls .ctl-row { display: flex; justify-content: space-between; gap: 12px; }
       #controls label { color: #9aa0ac; letter-spacing: 0.3px; }
@@ -53,11 +67,15 @@
       #controls button {
         background: rgba(125,211,252,0.14); color: #cfe9fb; border: 1px solid rgba(125,211,252,0.35);
         border-radius: 8px; padding: 7px 12px; font-size: 12px; cursor: pointer; white-space: nowrap;
+        display: flex; align-items: center; justify-content: center; gap: 6px;
       }
       #controls button:hover { background: rgba(125,211,252,0.24); }
       #controls .sep { width: 1px; align-self: stretch; background: rgba(255,255,255,0.1); }
       /* "Show all" only exists while something is hidden. */
       #controls button.gone { display: none; }
+      /* Collapses the sliders on narrow screens — see the media query below.
+         (#controls > selector, not just #controls-toggle, to outrank "#controls button" above.) */
+      #controls > #controls-toggle { display: none; }
 
       #inspect {
         position: fixed; top: 12px; right: 12px; z-index: 10; width: 250px;
@@ -100,11 +118,41 @@
         transition: opacity 0.3s;
       }
       #notice.hidden { opacity: 0; pointer-events: none; }
+
+      @media (max-width: 480px) {
+        /* HUD stats collapse behind a small chip so they don't crowd the model. */
+        #hud { display: none; max-width: calc(100vw - 24px); }
+        #hud.open { display: block; }
+        #hud .hud-close {
+          display: block; position: absolute; top: 8px; right: 10px;
+          background: none; border: none; color: #9aa0ac; cursor: pointer; font-size: 14px; padding: 0 2px;
+        }
+        #hud .hud-close:hover { color: #e8eaf0; }
+        #hud-toggle { display: flex; }
+
+        /* Bottom bar: icon row stays put; sliders fold away behind it.
+           width:max-content, not just max-width, so the flex-wrap layout sizes
+           itself from the (now-narrow) icon row's natural width instead of
+           quirkily wrapping into a squarer block first. */
+        #controls { gap: 10px 14px; padding: 10px 12px; bottom: 10px; width: max-content; }
+        #controls .sep { display: none; }
+        #controls-sliders { display: none; width: 100%; }
+        #controls-sliders.open {
+          display: flex; flex-direction: column; align-items: stretch; gap: 10px;
+        }
+        #controls-sliders.open input[type=range] { width: 100%; }
+        #controls > #controls-toggle { display: inline-flex; align-items: center; justify-content: center; padding: 7px 10px; }
+        /* Icon-only buttons: labels take up too much width to stay on one row. */
+        #controls button { padding: 7px 10px; font-size: 15px; }
+        #controls .btn-label { display: none; }
+      }
     </style>
   </head>
   <body>
     <div id="app"></div>
+    <button id="hud-toggle" title="Show info">i</button>
     <div id="hud">
+      <button class="hud-close" id="hud-close" title="Close">✕</button>
       <h1>Tintin Moon Rocket <span class="meta">· 21367</span></h1>
       <div class="meta" id="status">Initialising…</div>
       <div class="row"><span>Bricks (LDR)</span><span id="stat-bricks">—</span></div>
@@ -128,19 +176,22 @@
       <div class="ins-hint" id="ins-hint">Click a brick to inspect · Esc to close · U un-hides the last</div>
     </div>
     <div id="controls">
-      <div class="ctl">
-        <div class="ctl-row"><label>Explode</label><span class="val" id="explode-val">0%</span></div>
-        <input id="explode" type="range" min="0" max="300" value="0" />
+      <div id="controls-sliders">
+        <div class="ctl">
+          <div class="ctl-row"><label>Explode</label><span class="val" id="explode-val">0%</span></div>
+          <input id="explode" type="range" min="0" max="300" value="0" />
+        </div>
+        <div class="sep"></div>
+        <div class="ctl">
+          <div class="ctl-row"><label>Build step</label><span class="val" id="step-val">—</span></div>
+          <input id="step" type="range" min="0" />
+        </div>
       </div>
-      <div class="sep"></div>
-      <div class="ctl">
-        <div class="ctl-row"><label>Build step</label><span class="val" id="step-val">—</span></div>
-        <input id="step" type="range" min="0" />
-      </div>
-      <button id="play">▶ Play build</button>
-      <button id="recentre" title="Undo panning: put the pivot back on the rocket's axis (R)">⌖ Recentre</button>
-      <button id="share" title="Copy a link to this exact view">🔗 Copy link</button>
-      <button id="show-all" class="gone" title="Un-hide every hidden brick (U undoes one)">↺ Show all (0)</button>
+      <button id="controls-toggle" title="Explode & build-step sliders">⚙</button>
+      <button id="play"><span class="btn-icon">▶</span><span class="btn-label">Play build</span></button>
+      <button id="recentre" title="Undo panning: put the pivot back on the rocket's axis (R)"><span class="btn-icon">⌖</span><span class="btn-label">Recentre</span></button>
+      <button id="share" title="Copy a link to this exact view"><span class="btn-icon">🔗</span><span class="btn-label">Copy link</span></button>
+      <button id="show-all" class="gone" title="Un-hide every hidden brick (U undoes one)"><span class="btn-icon">↺</span><span class="btn-label">Show all (0)</span></button>
     </div>
     <div id="notice" class="hidden"></div>
     <div id="loading">
