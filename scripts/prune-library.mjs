@@ -3,9 +3,12 @@
 // actually references (plus their recursive sub-parts and primitives).
 //
 //   node scripts/prune-library.mjs           # dry run: report what would be kept
-//   node scripts/prune-library.mjs --apply   # copy the needed subset to public/ldraw-min
+//   node scripts/prune-library.mjs --apply   # copy the needed subset to ldraw-min/
 //
-// public/ldraw-min/ IS served (and committed) — it's what the app runs on.
+// ldraw-min/ is committed (it's small — a few MB), but it's a build-time input
+// to scripts/bake-model.mjs, not something the app fetches at runtime — so,
+// unlike the full library, it deliberately lives outside public/ too. See
+// bake-model.mjs and the "Parts library" section in the README.
 
 import fs from 'fs';
 import path from 'path';
@@ -13,7 +16,7 @@ import { fileURLToPath } from 'url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const LIB = path.join(root, 'ldraw-library');
-const OUT = path.join(root, 'public/ldraw-min');
+const OUT = path.join(root, 'ldraw-min');
 // The rocket is what ships; the split-out minifig gear (see
 // scripts/strip-loose-elements.mjs) isn't rendered, but keep its parts in the
 // slim library so it can be dropped back in later without a full re-prune.
@@ -68,7 +71,7 @@ if (fs.existsSync(path.join(LIB, 'LDConfig.ldr'))) keep.add('LDConfig.ldr');
 
 console.log(`Model needs ${keep.size} library files (of ~46k total).`);
 if (!apply) {
-  console.log('Dry run. Re-run with --apply to write public/ldraw-min/.');
+  console.log('Dry run. Re-run with --apply to write ldraw-min/.');
   process.exit(0);
 }
 
@@ -80,5 +83,5 @@ for (const rel of keep) {
   fs.copyFileSync(src, dst);
   bytes += fs.statSync(src).size;
 }
-console.log(`Wrote ${keep.size} files (${(bytes / 1e6).toFixed(1)} MB) to public/ldraw-min/`);
-console.log("Now set LIBRARY_PATH = '/ldraw-min/' in src/main.js.");
+console.log(`Wrote ${keep.size} files (${(bytes / 1e6).toFixed(1)} MB) to ldraw-min/`);
+console.log('Now run scripts/bake-model.mjs to regenerate public/model/tintin-rocket.glb.');

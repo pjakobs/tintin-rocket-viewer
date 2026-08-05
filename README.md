@@ -18,24 +18,36 @@ npm install
 npm run dev        # http://localhost:5173  (or the port Vite prints)
 ```
 
-The repo ships with a **slim LDraw parts library** (`public/ldraw-min/`, ~2.7 MB)
-containing only the ~529 parts and primitives this model actually uses, so it
-works out of the box. See [Parts library](#parts-library) to regenerate or use
-the full library.
+The repo ships with a **pre-baked model** (`public/model/tintin-rocket.glb`) —
+the browser loads that directly, so it works out of the box with no LDraw
+parsing at runtime. See [Parts library](#parts-library) and
+[Performance: why a pre-baked model](#performance-why-a-pre-baked-model) if
+you're changing the model itself.
+
+## Testing
+
+```bash
+npm test            # runs once and exits (src/*.test.js, via Vitest)
+npm run test:watch  # reruns on save, for iterating
+```
 
 ## What's here
 
 ```
 public/
   model/
-    tintin-rocket.ldr          # the model (derived from references/, MPD w/ 35 submodels)
+    tintin-rocket.ldr          # the source model (derived from references/, MPD w/ 35 submodels)
+    tintin-rocket.glb          # pre-baked from the above — what the browser actually loads
+    part-descriptions.json     # per-part description strings, for the click-to-inspect panel
     rebrickable_parts.csv      # manual-derived parts list, for the sanity check
-  ldraw-min/                   # slim LDraw library (parts/, p/, LDConfig.ldr)
+ldraw-min/                     # slim LDraw library (parts/, p/, LDConfig.ldr) — a build-time
+                                # input to bake-model.mjs, not served to the browser
 src/
   main.js                      # scene, loader, controls, framing, HUD
   crosscheck.js                # LDR↔CSV part-count reconciliation
 scripts/
-  prune-library.mjs            # build the slim library from the full one
+  prune-library.mjs            # build ldraw-min/ from the full library
+  bake-model.mjs                 # parse ldraw-min/ + the .ldr and export tintin-rocket.glb
   strip-loose-elements.mjs     # split the export into rocket + minifig gear
 references/                    # original source files (untouched)
   minifig-gear.ldr             # the 74 loose bricks, split out for later use
@@ -189,7 +201,10 @@ those 16 part geometries available.
 
 ## Parts library
 
-`public/ldraw-min/` is generated, not authored. To rebuild it:
+`ldraw-min/` is generated, not authored, and — unlike before — it's a
+*build-time* input, not something the browser fetches (see
+[Performance](#performance-why-a-pre-baked-model)). To rebuild it and the model
+that's baked from it:
 
 ```bash
 # 1. Download the official (and optionally unofficial) LDraw library, and extract
@@ -201,15 +216,56 @@ those 16 part geometries available.
 # 2. Add the Studio custom parts (bl_8097 nose cone, bl_98138pb459 tile):
 node scripts/extract-custom-parts.mjs     # pulls geometry from the .io export
 
-# 3. Slim it to just this model's parts (~529 files, ~2.7 MB):
-node scripts/prune-library.mjs --apply    # writes public/ldraw-min/
+# 3. Slim it to just this model's parts (~529 files, ~1.5 MB):
+node scripts/prune-library.mjs --apply    # writes ldraw-min/
+
+# 4. Re-bake the model the browser actually loads:
+node scripts/bake-model.mjs               # writes public/model/tintin-rocket.{glb,part-descriptions.json}
 ```
+
+Re-run steps 3–4 (from the repo root, no download needed) any time
+`public/model/tintin-rocket.ldr` changes — e.g. after re-exporting from Studio.
 
 > **Keep the full library out of `public/`.** `vite build` copies everything
 > under `public/` into `dist/` verbatim (that's the whole point of `publicDir`),
 > so an ~820 MB library sitting in `public/ldraw/` turns a 3 MB deploy into a
 > ~950 MB one. `ldraw-library/` at the repo root is gitignored and only ever
-> used as the prune script's *source* — nothing reads from it at runtime.
+> used as the prune script's *source* — nothing reads from it at runtime. The
+> same now goes for the pruned `ldraw-min/`: it's committed (it's small) but
+> lives outside `public/` too, since `bake-model.mjs` is the only thing that
+> reads it.
+
+## Performance: why a pre-baked model
+
+Loading raw LDraw directly with `LDrawLoader` (as this project originally did)
+turned out to have two real costs on a phone, discovered by profiling actual
+load time rather than assuming:
+
+1. **~500 network requests.** LDraw parses text and lazily fetches every
+   referenced part/primitive as its own file. Even a slim, pruned library
+   means hundreds of round trips, which dominate load time on high-latency
+   mobile connections.
+2. **Runtime CPU cost.** `LDrawLoader`'s `smoothNormals` option recomputes
+   shared vertex normals per unique part so curved surfaces (the nose cone,
+   engines) shade smoothly instead of looking faceted. Cheap on a desktop;
+   profiling under CPU throttling showed it dominating load time on a
+   mid/low-end phone — 40+ seconds of main-thread work, ~96% of total load
+   time.
+
+`scripts/bake-model.mjs` runs the exact same `LDrawLoader` pipeline once, at
+build time (in plain Node — no browser needed, since geometry building never
+touches the DOM or WebGL), and exports the already-smoothed result to a single
+`public/model/tintin-rocket.glb` via `GLTFExporter`. The browser then loads
+that with `GLTFLoader`: one binary file, no text parsing, no normal-smoothing
+math — just buffers to deserialize. Per-brick metadata (`fileName`,
+`buildingStep`, `colorCode`) that `features.js`/`hotspots.js` need survives the
+round trip via glTF node `extras`.
+
+One caveat: `GLTFExporter` can't serialize `LDrawConditionalLineMaterial` (a
+`ShaderMaterial`), so the bake script strips LDraw's *conditional* lines — the
+view-dependent silhouette curves on rounded parts — before export. Regular
+hard-edge lines are unaffected. Compared side-by-side, the difference is not
+visually noticeable on this model.
 
 ## Interactive features (`src/features.js`)
 

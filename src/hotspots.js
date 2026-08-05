@@ -8,7 +8,7 @@ import { bindKey } from './keymap.js';
 const HIGHLIGHT = 0x37c0ff;        // selection colour (emissive glow + box)
 const DRAG_THRESHOLD = 5;          // px of pointer travel that counts as an orbit, not a click
 
-export function initHotspots({ camera, renderer, features, libraryPath }) {
+export function initHotspots({ camera, renderer, features, descriptions }) {
   const dom = renderer.domElement;
 
   // mesh -> brick entry, and a flat list of pickable meshes
@@ -94,20 +94,6 @@ export function initHotspots({ camera, renderer, features, libraryPath }) {
   // ---- info panel ----------------------------------------------------------
   const panel = document.getElementById('inspect');
   const el = (id) => document.getElementById(id);
-  const descCache = new Map();
-
-  async function fetchDesc(fileName) {
-    if (descCache.has(fileName)) return descCache.get(fileName);
-    let desc = '';
-    try {
-      const text = await fetch(`${libraryPath}parts/${fileName}`).then((r) => (r.ok ? r.text() : ''));
-      const line = text.split(/\r?\n/).find((l) =>
-        /^0 /.test(l) && !/^0 (Name:|Author:|!|BFC|\/\/|FILE)/i.test(l.trim()));
-      desc = line ? line.replace(/^0 ~?/, '').trim() : '';
-    } catch { /* description is optional */ }
-    descCache.set(fileName, desc);
-    return desc;
-  }
 
   function showPanel(brick, hitMesh) {
     const ud = brick.group.userData;
@@ -124,10 +110,8 @@ export function initHotspots({ camera, renderer, features, libraryPath }) {
     el('ins-color').innerHTML = `<span class="swatch" style="background:${hex}"></span>${colName}`;
     el('ins-step').textContent = `${brick.step} / ${features.maxStep}`;
     el('ins-count').textContent = `${countByPart.get(fileName.toLowerCase()) || 1}×`;
-    el('ins-desc').textContent = '…';
+    el('ins-desc').textContent = descriptions[fileName.toLowerCase()] || '—';
     panel.classList.remove('hidden');
-
-    fetchDesc(fileName).then((d) => { if (selected === brick) el('ins-desc').textContent = d || '—'; });
   }
 
   function hidePanel() { panel.classList.add('hidden'); }

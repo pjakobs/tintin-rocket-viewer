@@ -31,7 +31,7 @@ import { execFileSync } from 'child_process';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const IO = path.join(root, 'references', 'Lego Tintin-Full inventory.io');
-const LIBS = [path.join(root, 'ldraw-library/parts'), path.join(root, 'public/ldraw-min/parts')];
+const LIBS = [path.join(root, 'ldraw-library/parts'), path.join(root, 'ldraw-min/parts')];
 
 // Embedded MPD section name in model2.ldr -> target bl_* filename we write.
 const MAP = {

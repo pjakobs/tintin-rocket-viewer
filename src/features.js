@@ -29,7 +29,13 @@ function fingerprintOf(entries) {
 }
 
 function collectBricks(root) {
-  const isDat = (o) => o.isGroup && /\.dat$/i.test(o.userData?.fileName || '');
+  // Not gated on o.isGroup: LDrawLoader always builds brick containers as
+  // THREE.Group, but a group with no mesh/camera/light attached directly to
+  // itself (true of every brick container — its meshes are children, not
+  // itself) round-trips through GLTFExporter/GLTFLoader as a plain
+  // THREE.Object3D instead. The userData.fileName tag is what actually
+  // identifies a brick, regardless of which class it comes back as.
+  const isDat = (o) => /\.dat$/i.test(o.userData?.fileName || '');
   const bricks = [];
   root.traverse((o) => {
     if (!isDat(o)) return;
