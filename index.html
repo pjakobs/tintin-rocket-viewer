@@ -19,6 +19,8 @@
         border: 1px solid rgba(255,255,255,0.08);
       }
       #hud h1 { font-size: 14px; margin-bottom: 4px; letter-spacing: 0.2px; }
+      #hud a, #hud a:visited { color: #7dd3fc; text-decoration: none; }
+      #hud a:hover { text-decoration: underline; }
       #hud .meta { color: #9aa0ac; font-size: 12px; }
       #hud .row { display: flex; justify-content: space-between; gap: 12px; }
       #hud .row span:last-child { color: #7dd3fc; font-variant-numeric: tabular-nums; }
@@ -153,13 +155,14 @@
     <button id="hud-toggle" title="Show info">i</button>
     <div id="hud">
       <button class="hud-close" id="hud-close" title="Close">✕</button>
-      <h1>Tintin Moon Rocket <span class="meta">· 21367</span></h1>
+      <h1><a href="https://rebrickable.com/blog/937/review-21367-1-tintin-moon-rocket/" target="_blank" rel="noopener">Tintin Moon Rocket</a> <span class="meta">· 21367</span></h1>
       <div class="meta" id="status">Initialising…</div>
-      <div class="row"><span>Bricks (LDR)</span><span id="stat-bricks">—</span></div>
-      <div class="row"><span>Manual CSV</span><span id="stat-csv">—</span></div>
-      <div class="row"><span>Meshes drawn</span><span id="stat-parts">—</span></div>
-      <div class="row"><span>Missing parts</span><span id="stat-missing">—</span></div>
-      <div class="meta" id="stat-note" style="margin-top:6px"></div>
+      <div class="row"><span>Bricks</span><span id="stat-bricks">—</span></div>
+      <div class="meta" id="brick-note" style="margin-top:6px">Rocket assembly only — excludes 74 loose minifig-gear pieces from the full inventory of 1,255.</div>
+      <div class="meta" style="margin-top:8px">
+        <a href="https://rebrickable.com/sets/21367-1/tintin-moon-rocket/#models" target="_blank" rel="noopener">Model</a>
+        <span> · April 30, 2026 · 471.3 KB</span>
+      </div>
       <div class="meta" id="hud-hint" style="margin-top:8px">Drag to orbit · scroll to zoom · right-drag to pan · R to recentre</div>
     </div>
     <div id="inspect" class="hidden">

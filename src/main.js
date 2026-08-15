@@ -84,8 +84,6 @@ export const model = {
   fingerprint: null, // set by initFeatures(): order-sensitive hash of the brick list
 };
 
-let meshCount = 0; // placed meshes, for the HUD's "Meshes drawn" row
-
 // ---------------------------------------------------------------------------
 // Load
 // ---------------------------------------------------------------------------
@@ -132,13 +130,10 @@ function onModelLoaded(group, descriptions) {
   // hierarchy the clickable hotspots and build-progress animation depend on.
   // ~1,250 separate meshes render comfortably at 60fps.
 
-  group.traverse((child) => { if (child.isMesh) meshCount++; });
-
   model.root = group;
   scene.add(group);
 
   frameModel(group);
-  updateHUD();
   const features = initFeatures(model);
   const hotspots = initHotspots({ camera, renderer, features, descriptions });
   const state = initStateSync({ camera, controls, features, hotspots });
@@ -164,18 +159,13 @@ function onModelLoaded(group, descriptions) {
 
   // Sanity check: reconcile the baked model's brick count with the manual CSV.
   // Fetched separately (and only) here — this is the one place that still
-  // wants the raw LDraw text, not the baked glTF.
+  // wants the raw LDraw text, not the baked glTF. The full reconciliation
+  // (including the CSV comparison) only ever goes to the console — see
+  // crossCheck() — since visitors have no use for that detail; the HUD just
+  // wants the live brick count.
   fetch(MODEL_LDR_URL).then((r) => r.text()).then((modelText) => crossCheck(modelText)).then((r) => {
     model.crossCheck = r;
     document.getElementById('stat-bricks').textContent = r.ldrBricks.toLocaleString();
-    if (r.csvBricks != null) {
-      document.getElementById('stat-csv').textContent = r.csvBricks.toLocaleString();
-      const delta = r.csvBricks - r.ldrBricks;
-      document.getElementById('stat-note').textContent =
-        `${r.matchedParts} part IDs matched · Δ${delta > 0 ? '+' : ''}${delta} (minifig sub-parts & print variants the manual lists separately)`;
-    } else {
-      document.getElementById('stat-csv').textContent = 'n/a';
-    }
   });
 }
 
@@ -232,13 +222,6 @@ function recentre() {
 
 document.getElementById('recentre').addEventListener('click', recentre);
 bindKey('r', recentre, { label: 'R to recentre' });
-
-function updateHUD() {
-  document.getElementById('stat-parts').textContent = meshCount.toLocaleString();
-  // A successfully-loaded baked model (see scripts/bake-model.mjs) is
-  // self-contained — there's no per-part fetch left at runtime that could fail.
-  document.getElementById('stat-missing').textContent = '0';
-}
 
 // Expose viewer internals for the browser console and future feature scripts.
 window.viewer = { THREE, scene, camera, renderer, controls, model };
