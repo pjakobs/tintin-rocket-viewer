@@ -8,7 +8,7 @@ animation.
 
 ![viewer](docs/screenshot.png)
 
-**Live:** https://tintin-beta.vercel.app — every view (explode amount, build
+**Live:** https://tintin-rocket.vercel.app — every view (explode amount, build
 step, selected part, camera) is shareable via *Copy link*.
 
 ## Quick start

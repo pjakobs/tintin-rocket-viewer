@@ -140,6 +140,7 @@ export function initFeatures(model) {
   const playLabel = playBtn.querySelector('.btn-label');
   const showAllBtn = document.getElementById('show-all');
   const showAllLabel = showAllBtn.querySelector('.btn-label');
+  const resetBtn = document.getElementById('reset-view');
 
   stepEl.max = String(maxStep);
 
@@ -198,6 +199,17 @@ export function initFeatures(model) {
     api.onChange?.();
   }
 
+  // Puts explode, build step and hidden bricks back to their startup values in
+  // one go — unlike showAllHidden(), which only ever touches the hidden set.
+  function resetView() {
+    stopPlay(); // otherwise the animation loop overwrites view.step right back
+    for (const e of hiddenStack) e.hidden = false;
+    hiddenStack.length = 0;
+    Object.assign(view, { explode: 0, step: maxStep });
+    render();
+    api.onChange?.();
+  }
+
   render(); // sync sliders/labels to the initial view before anything can change it
 
   const onExplodeInput = () => setView({ explode: explodeEl.valueAsNumber / 100 });
@@ -231,6 +243,7 @@ export function initFeatures(model) {
 
   // ---- hide / restore ------------------------------------------------------
   showAllBtn.addEventListener('click', showAllHidden);
+  resetBtn.addEventListener('click', resetView);
 
   // A hidden brick can't be clicked (hotspots.js skips invisible bricks), so
   // un-hiding has to come from here: `U`, or Cmd/Ctrl+Z for the usual reflex.
@@ -246,6 +259,7 @@ export function initFeatures(model) {
   api.setHidden = setHidden;
   api.unhideLast = unhideLast;
   api.showAllHidden = showAllHidden;
+  api.resetView = resetView;
   api.onChange = null; // assigned by main.js
   Object.defineProperty(api, 'hiddenIndices', {
     get: () => hiddenStack.map((b) => b.index),
@@ -256,6 +270,7 @@ export function initFeatures(model) {
     stepEl.removeEventListener('input', onStepInput);
     playBtn.removeEventListener('click', onPlayClick);
     showAllBtn.removeEventListener('click', showAllHidden);
+    resetBtn.removeEventListener('click', resetView);
     // Keymap bindings aren't unregistered — keymap.js has no unbind, and
     // dispose() isn't wired to anything yet (see the composition refactor).
   };

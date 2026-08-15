@@ -146,6 +146,10 @@ function onModelLoaded(group, descriptions) {
   hotspots.onChange = state.scheduleWrite;
   state.restore();
 
+  // Reset also clears the current selection, so the inspect panel doesn't linger
+  // pointed at a brick that's no longer part of an intentional view.
+  document.getElementById('reset-view').addEventListener('click', () => hotspots.deselect());
+
   // Refresh the two hint strings from the keymap now that features.js and
   // hotspots.js have registered their bindings, so the shortcuts shown can't
   // drift from what's actually bound.
